@@ -1,67 +1,67 @@
 # 🎮 Steam Wishlist Sales Checker (v1.2)
 
-Code written with Claude (Anthropic). This is a learning project to see how "curl" and "Invoke-RestMethod" commands could grab informations from Steam API.
-An executable is also available for Windows if you want to simply scan your wishlist sales without any installation in releases page.
+Code généré par Claude (Anthropic). Ceci est un projet pour comprendre la possibilité de récupérer des informations avec la commande "curl" et "Invoke-RestMethod" via l'API Steam.
+Une version exécutable pour Windows est également disponible sans aucune installation pour simplement vérifier les promotions de votre liste de souhaits Steam, dans la page "Releases".
 
-Automatically monitors your Steam wishlist and displays games on sale on a sleek, self-hosted web page.
+Surveille automatiquement votre wishlist Steam et affiche les jeux en promotion sur une page web élégante, auto-hébergée.
 
 ![Steam Wishlist Sales](screenshots/result.png)
 ![Steam Wishlist Sales](screenshots/result-classic.png)
 
-## Features
+## Fonctionnalites
 
-- **Automatic scanning** of your wishlist via the Steam API (every 6 hours by default)
-- **Tracking badges**: blue **NEW** badge for newly discounted games, red **Price 🔼** if price went up, green **Price 🔽** if price dropped since last scan
-- **Filter new only** : show only new discounted games
-- **Smart cache**: only new sale entries trigger API calls; everything else is read from local cache (5x faster scans)
-- **Clear cache button** (Linux/PHP): one click to reset everything, with confirmation dialog
-- **Genre filters**: Action, RPG, Indie... combinable with text search
-- **Dual theme**: Modern (default) or Classic Steam retro (2004-2010), persisted via cookie
-- **Self-hosted web page** with a Steam-inspired design
-- **Sorting**: alphabetical, price ascending/descending, discount %
-- **Real-time search** by game name
-- **Manual refresh button** with live scan tracking
-- **Statistics**: sale count, best discount, lowest price, next scan countdown
-- **Responsive**: adapts to mobile and desktop
-- **Lightweight**: static HTML page, no database required
-- **Windows version**: standalone PowerShell script included
+- **Scan automatique** de la wishlist via l'API Steam (toutes les 6h par defaut)
+- **Badges de suivi** : badge bleu **NEW** pour les nouveaux jeux en promo, badge rouge **Prix 🔼** si le prix a augmente, badge vert **Prix 🔽** si le prix a baisse depuis le dernier scan
+- **Trier par nouveauté** : affiche uniquement les nouveaux jeux en promotion
+- **Cache intelligent** : seuls les nouveaux jeux en promo sont recuperes, les autres sont lus depuis le cache local (scan 5x plus rapide)
+- **Bouton vider le cache** (Linux/PHP) : un clic pour tout reinitialiser, avec confirmation
+- **Filtres par genre** : Action, RPG, Indie... combinables avec la recherche textuelle
+- **Double theme** : Modern (par defaut) ou Classic Steam retro (2004-2010), persistant via cookie
+- **Page web auto-hebergee** avec un design inspire de Steam
+- **Tri** : alphabetique, prix croissant/decroissant, % de promotion
+- **Recherche** en temps reel par nom de jeu
+- **Bouton d'actualisation manuelle** avec suivi en direct du scan
+- **Statistiques** : nombre de promos, meilleure remise, prix le plus bas, prochain scan
+- **Responsive** : s'adapte au mobile et au desktop
+- **Leger** : page HTML statique, pas de base de donnees
+- **Version Windows** : script PowerShell standalone inclus
 
-## Requirements
+## Prerequis
 
-### Linux (main version)
+### Linux (version principale)
 
-- **Linux** (Debian/Ubuntu recommended)
-- **Apache2** with **PHP 8.x**
+- **Linux** (Debian/Ubuntu recommande)
+- **Apache2** avec **PHP 8.x**
 - **curl**, **jq**, **bc**
-- A **public Steam profile** with a **public wishlist**
+- Un **profil Steam public** avec une **wishlist publique**
 
-### Windows (standalone version)
+### Windows (version standalone)
 
-- **Windows 10/11** with **PowerShell 5.1+**
-- No other dependencies
+- **Windows 10/11** avec **PowerShell 5.1+**
+- Aucune autre dependance
 
-## Quick Install (Linux as root user)
+## Installation rapide (Linux en utilisateur root)
 
 ```bash
-git clone https://github.com/W1p3out/steam-wishlist-sales-checker/
-cd steam-wishlist-sales-checker
+git clone https://github.com/W1p3out/steam-wishlist-sales-checkersteam-wishlist-sales.git
+cd steam-wishlist-sales
 chmod +x install.sh
 ./install.sh
 ```
 
-The installer will ask for:
+Le script d'installation vous demandera :
 
-| Parameter | Description | Example |
+| Parametre | Description | Exemple |
 |---|---|---|
-| **Steam ID** | Your 64-bit Steam ID (17 digits) | `76561198040773990` |
-| **Port** | Web server port | `2251` |
-| **Scan hours** | Automatic scan schedule (cron format) | `1,7,13,19` |
+| **Steam ID** | Votre identifiant Steam 64-bit (17 chiffres) | `76561198040773990` |
+| **Port** | Port du serveur web | `2251` |
+| **Heures de scan** | Heures de scan automatique (format cron) | `1,7,13,19` |
 
-> 💡 **Find your Steam ID**: visit [steamid.io](https://steamid.io/) and enter your Steam profile URL.
+> 💡 **Trouver votre Steam ID** : rendez-vous sur [steamid.io](https://steamid.io/) et entrez votre profil Steam.
 
-> ⚠️ **Your profile and wishlist must be public** for scanning to work.
+> ⚠️ **Votre profil et votre wishlist doivent etre publics** pour que le scan fonctionne.
 
-## Windows Usage (PowerShell)
+## Utilisation Windows (PowerShell)
 
 ```powershell
 .\SteamWishlistSales.ps1 -SteamID 76561198040773990
@@ -69,25 +69,25 @@ The installer will ask for:
 .\SteamWishlistSales.ps1 76561198040773990 -ClearCache
 ```
 
-The script generates an HTML file in `%TEMP%` and opens it in your default browser. Cache is stored in `%APPDATA%\SteamWishlistSales\`.
+Le script genere un fichier HTML dans `%TEMP%` et l'ouvre automatiquement dans le navigateur. Le cache est stocke dans `%APPDATA%\SteamWishlistSales\`.
 
-| Parameter | Description | Default |
+| Parametre | Description | Defaut |
 |---|---|---|
-| **SteamID** | Your 64-bit Steam ID | (prompted interactively) |
-| **Country** | Country code for pricing | `fr` |
-| **OutputPath** | Path for generated HTML | `%TEMP%\steam-wishlist-sales.html` |
-| **ClearCache** | Clear cache before scanning | disabled |
+| **SteamID** | Votre Steam ID 64-bit | (demande interactivement) |
+| **Country** | Code pays pour les prix | `fr` |
+| **OutputPath** | Chemin du HTML genere | `%TEMP%\steam-wishlist-sales.html` |
+| **ClearCache** | Vider le cache avant le scan | desactive |
 
-## Manual Install (Linux)
+## Installation manuelle (Linux)
 
-### 1. Install dependencies
+### 1. Installer les dependances
 
 ```bash
 sudo apt update
 sudo apt install curl jq bc apache2 php libapache2-mod-php sudo
 ```
 
-### 2. Copy files
+### 2. Copier les fichiers
 
 ```bash
 sudo mkdir -p /opt/steam-wishlist-sales
@@ -97,29 +97,27 @@ sudo chmod +x /opt/steam-wishlist-sales/steam-wishlist-sales.sh
 sudo mkdir -p /var/www/steam-wishlist-sales
 sudo cp web/run.php web/update.php /var/www/steam-wishlist-sales/
 
-# Initialize cache
+# Initialiser le cache
 echo '{}' | sudo tee /var/www/steam-wishlist-sales/cache.json
 sudo chmod 644 /var/www/steam-wishlist-sales/cache.json
 sudo chown www-data:www-data /var/www/steam-wishlist-sales/cache.json
 ```
 
-### 3. Set your Steam ID
+### 3. Configurer le Steam ID
 
 ```bash
 sudo nano /opt/steam-wishlist-sales/steam-wishlist-sales.sh
 ```
 
 ```bash
-STEAM_ID="YOUR_STEAM_ID_HERE"
+STEAM_ID="VOTRE_STEAM_ID_ICI"
 ```
 
-### 4. Configure Apache
+### 4. Configurer Apache
 
-Create `/etc/apache2/sites-available/steam-wishlist-sales.conf`:
+Creez le fichier `/etc/apache2/sites-available/steam-wishlist-sales.conf` :
 
 ```apache
-Listen 2251
-
 <VirtualHost *:2251>
     DocumentRoot /var/www/steam-wishlist-sales
     DirectoryIndex index.html
@@ -141,20 +139,27 @@ Listen 2251
 </VirtualHost>
 ```
 
+
+Ajoutez le port dans `/etc/apache2/ports.conf` :
+
+```bash
+echo "Listen 2251" >> /etc/apache2/ports.conf
+```
+
 ```bash
 sudo a2enmod headers
 sudo a2ensite steam-wishlist-sales
 sudo systemctl restart apache2
 ```
 
-### 5. Set permissions
+### 5. Configurer les permissions
 
 ```bash
 echo "www-data ALL=(ALL) NOPASSWD: /opt/steam-wishlist-sales/steam-wishlist-sales.sh" | sudo tee /etc/sudoers.d/steam-wishlist-sales
 sudo chmod 440 /etc/sudoers.d/steam-wishlist-sales
 ```
 
-### 6. Set up cron
+### 6. Configurer le cron
 
 ```bash
 crontab -e
@@ -164,94 +169,94 @@ crontab -e
 5 1,7,13,19 * * * /opt/steam-wishlist-sales/steam-wishlist-sales.sh > /tmp/steam-wishlist-current.log 2>&1
 ```
 
-### 7. First scan
+### 7. Premier scan
 
 ```bash
 sudo /opt/steam-wishlist-sales/steam-wishlist-sales.sh
 ```
 
-The first scan fetches all games (~5 min for ~1500 games). Subsequent scans are much faster thanks to the cache.
+Le premier scan recupere tous les jeux (~5 min pour ~1500 jeux). Les suivants sont bien plus rapides grace au cache.
 
-## Usage
+## Utilisation
 
-### Access the page
+### Acceder a la page
 
 ```
-http://YOUR_IP:2251/
+http://VOTRE_IP:2251/
 ```
 
-### Page features
+### Fonctionnalites de la page
 
-- **Sort**: A-Z, Price Up, Price Down, Discount % buttons
-- **Search**: real-time text search bar
-- **Genre filters**: click a genre to filter (combinable with search)
-- **Theme**: Classic Steam / Modern toggle button in the header (saved via cookie)
-- **Refresh**: click the refresh button for a live-tracked manual scan
-- **Next scan**: countdown displayed in the stats bar
-- **Steam link**: click any card to open the game's Steam page
+- **Tri** : boutons A→Z, Prix ↑, Prix ↓, % Promo
+- **Recherche** : barre de recherche en temps reel
+- **Filtres genre** : cliquez sur un genre pour filtrer (combinable avec la recherche)
+- **Theme** : bouton Classic Steam / Modern dans le header (sauvegarde via cookie)
+- **Actualisation** : bouton ↻ Actualiser avec log en direct
+- **Prochain scan** : compte a rebours dans la barre de statistiques
+- **Lien Steam** : cliquez sur une carte pour ouvrir la page Steam du jeu
 
 ## Architecture
 
 ```
 steam-wishlist-sales/
-├── install.sh                     # Automated installer
-├── uninstall.sh                   # Uninstaller
-├── SteamWishlistSales.ps1         # Windows version (standalone)
-├── README.md                      # French README
-├── README_EN.md                   # This file
-├── CHANGELOG.md                   # Version history
+├── install.sh                     # Script d'installation automatique
+├── uninstall.sh                   # Script de desinstallation
+├── SteamWishlistSales.ps1         # Version Windows (standalone)
+├── README.md                      # Ce fichier
+├── README_EN.md                   # README en anglais
+├── CHANGELOG.md                   # Historique des versions
 ├── LICENSE
 ├── screenshots/
 │   └── preview.png
 ├── scripts/
-│   └── steam-wishlist-sales.sh    # Main scan script
+│   └── steam-wishlist-sales.sh    # Script principal de scan
 └── web/
-    ├── run.php                    # Manual scan trigger
-    └── update.php                 # Live scan tracking page
+    ├── run.php                    # Declencheur de scan manuel
+    └── update.php                 # Page de suivi du scan en cours
 ```
 
-### Generated files at runtime
+### Fichiers generes a l'execution
 
 ```
 /var/www/steam-wishlist-sales/
-├── index.html                     # Generated HTML page
-└── cache.json                     # Name/image/genre cache
+├── index.html                     # Page HTML generee
+└── cache.json                     # Cache des noms/images/genres
 ```
 
-### How it works
+### Fonctionnement technique
 
-The `steam-wishlist-sales.sh` script runs in 5 steps:
+Le script `steam-wishlist-sales.sh` fonctionne en 5 etapes :
 
-1. **Wishlist** — Fetches the full list of app IDs via `IWishlistService/GetWishlist` (1 API call)
-2. **Prices** — Fetches prices in batches of 30 via `appdetails?filters=price_overview` (~46 calls)
-3. **Filtering** — Identifies games with `discount_percent > 0`
-4. **Names/Genres** — Checks the cache, then fetches only missing games via `appdetails` (genres extracted from `.data.genres[]`)
-5. **HTML** — Generates the `index.html` page with grid, genre filters, dual-theme CSS, and interactive JavaScript
+1. **Wishlist** — Recupere la liste complete des app IDs via `IWishlistService/GetWishlist` (1 appel API)
+2. **Prix** — Recupere les prix par lots de 30 via `appdetails?filters=price_overview` (~46 appels)
+3. **Filtrage** — Identifie les jeux ayant un `discount_percent > 0`
+4. **Noms/Genres** — Consulte le cache, puis recupere uniquement les jeux manquants via `appdetails` (genres extraits de `.data.genres[]`)
+5. **HTML** — Genere la page `index.html` avec grille, filtres genre, double theme CSS, et JavaScript interactif
 
-### Scan duration
+### Duree d'un scan
 
-| Wishlist size | First scan | Subsequent scans (cached) |
+| Wishlist | Premier scan | Scans suivants (cache) |
 |---|---|---|
-| ~500 games | ~2min | ~20s |
-| ~1000 games | ~4min | ~30s |
-| ~1500 games | ~5min | ~1min |
+| ~500 jeux | ~2min | ~20s |
+| ~1000 jeux | ~4min | ~30s |
+| ~1500 jeux | ~5min | ~1min |
 
-### Steam APIs used
+### API Steam utilisees
 
-| Endpoint | Purpose | Auth required |
+| Endpoint | Usage | Auth requise |
 |---|---|---|
-| `IWishlistService/GetWishlist/v1/` | List app IDs from wishlist | No (public profile) |
-| `store.steampowered.com/api/appdetails` | Prices, names, images, genres | No |
+| `IWishlistService/GetWishlist/v1/` | Liste des app IDs de la wishlist | Non (profil public) |
+| `store.steampowered.com/api/appdetails` | Prix, noms, images, genres | Non |
 
-## Troubleshooting
+## Depannage
 
-### Scan finds no games
+### Le scan ne trouve aucun jeu
 
-- Make sure your **Steam profile is public**
-- Make sure your **wishlist is public**
-- Test manually: `curl -sL "https://api.steampowered.com/IWishlistService/GetWishlist/v1/?steamid=YOUR_ID"`
+- Verifiez que votre **profil Steam est public**
+- Verifiez que votre **wishlist est publique**
+- Testez : `curl -sL "https://api.steampowered.com/IWishlistService/GetWishlist/v1/?steamid=VOTRE_ID"`
 
-### Cache appears corrupted
+### Le cache semble corrompu
 
 ```bash
 # Linux
@@ -265,21 +270,21 @@ sudo chown www-data:www-data /var/www/steam-wishlist-sales/cache.json
 .\SteamWishlistSales.ps1 76561198040773990 -ClearCache
 ```
 
-### Refresh button not working
+### Le bouton Actualiser ne fonctionne pas
 
-- Check sudo permissions: `sudo -u www-data sudo /opt/steam-wishlist-sales/steam-wishlist-sales.sh`
-- Check logs: `tail -f /var/log/apache2/steam-wishlist-sales-error.log`
+- Verifiez les permissions sudo : `sudo -u www-data sudo /opt/steam-wishlist-sales/steam-wishlist-sales.sh`
+- Verifiez les logs : `tail -f /var/log/apache2/steam-wishlist-sales-error.log`
 
-### PowerShell parsing error
+### Erreur de parsing PowerShell
 
-The PowerShell script must be UTF-8 encoded with BOM. If you edit the file, save it as "UTF-8 with BOM" in your editor.
+Le script PowerShell doit etre encode en UTF-8 avec BOM. Si vous editez le fichier, sauvegardez-le en "UTF-8 with BOM" dans votre editeur.
 
-## Uninstall
+## Desinstallation
 
 ```bash
 sudo ./uninstall.sh
 ```
 
-## License
+## Licence
 
-MIT — see [LICENSE](LICENSE)
+MIT — voir [LICENSE](LICENSE)

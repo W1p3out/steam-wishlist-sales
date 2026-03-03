@@ -141,6 +141,41 @@ if [ ! -f "$WEB_DIR/previous_sales.json" ]; then
     ok "Fichier de comparaison initialisé"
 fi
 
+# Créer une page d'attente si aucun index.html n'existe
+if [ ! -f "$WEB_DIR/index.html" ]; then
+    cat > "$WEB_DIR/index.html" << 'PLACEHOLDER'
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steam Wishlist Sales — Installation</title>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0e14; color: #c6d4df; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .box { text-align: center; padding: 60px 40px; max-width: 500px; }
+  .icon { font-size: 4rem; margin-bottom: 20px; }
+  h1 { font-size: 1.5rem; color: #fff; margin-bottom: 12px; }
+  p { font-size: 0.95rem; color: #8f98a0; line-height: 1.6; margin-bottom: 24px; }
+  .btn { display: inline-block; background: linear-gradient(135deg, #66c0f4, #4a9fd4); color: #fff; padding: 12px 32px; border-radius: 24px; text-decoration: none; font-size: 1rem; font-weight: 600; transition: transform 0.2s, box-shadow 0.2s; }
+  .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(102,192,244,0.3); }
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="icon">🎮</div>
+  <h1>Steam Wishlist Sales</h1>
+  <p>L'installation est terminée !<br>Lancez le premier scan pour générer la page des promotions.</p>
+  <a class="btn" href="run.php">▶ Lancer le premier scan</a>
+</div>
+</body>
+</html>
+PLACEHOLDER
+    chmod 644 "$WEB_DIR/index.html"
+    chown www-data:www-data "$WEB_DIR/index.html"
+    ok "Page d'attente créée"
+fi
+
 # ── Configuration du Steam ID ─────────────────────────────────
 log "Configuration du Steam ID..."
 
@@ -177,6 +212,15 @@ cat > "$VHOST_FILE" << EOF
     CustomLog \${APACHE_LOG_DIR}/steam-wishlist-sales-access.log combined
 </VirtualHost>
 EOF
+
+# Ajouter le Listen dans ports.conf (sans doublon)
+PORTS_CONF="/etc/apache2/ports.conf"
+if ! grep -q "^Listen ${PORT}$" "$PORTS_CONF" 2>/dev/null; then
+    echo "Listen ${PORT}" >> "$PORTS_CONF"
+    ok "Port ${PORT} ajouté à ports.conf"
+else
+    ok "Port ${PORT} déjà présent dans ports.conf"
+fi
 
 # Activer les modules nécessaires
 a2enmod headers > /dev/null 2>&1 || true

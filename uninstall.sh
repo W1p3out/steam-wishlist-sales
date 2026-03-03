@@ -41,6 +41,17 @@ echo ""
 
 # Désactiver le site Apache
 a2dissite steam-wishlist-sales > /dev/null 2>&1 || true
+
+# Retirer le port de ports.conf
+VHOST="/etc/apache2/sites-available/steam-wishlist-sales.conf"
+if [ -f "$VHOST" ]; then
+    USED_PORT=$(grep -oP '(?<=VirtualHost \*:)\d+' "$VHOST" 2>/dev/null | head -1)
+    if [ -n "$USED_PORT" ]; then
+        sed -i "/^Listen ${USED_PORT}$/d" /etc/apache2/ports.conf 2>/dev/null || true
+        echo -e "${GREEN}[OK]${NC} Port ${USED_PORT} retiré de ports.conf"
+    fi
+fi
+
 systemctl restart apache2 2>/dev/null || true
 echo -e "${GREEN}[OK]${NC} Site Apache désactivé"
 
