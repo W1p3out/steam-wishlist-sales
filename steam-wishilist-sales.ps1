@@ -21,9 +21,9 @@
     Deletes the cache before scanning (forces a full refresh)
 
 .EXAMPLE
-    .\SteamWishlistSales.ps1 -SteamID 12345678901234567
-    .\SteamWishlistSales.ps1 -SteamID 12345678901234567 -Country us
-    .\SteamWishlistSales.ps1 12345678901234567 -ClearCache
+    .\SteamWishlistSales.ps1 -SteamID 76561198040773990
+    .\SteamWishlistSales.ps1 -SteamID 76561198040773990 -Country us
+    .\SteamWishlistSales.ps1 76561198040773990 -ClearCache
 #>
 
 param(
@@ -82,6 +82,7 @@ if (-not $OutputPath) {
 }
 $CacheDir = Join-Path $env:APPDATA 'SteamWishlistSales'
 $CachePath = Join-Path $CacheDir "cache_$SteamID.json"
+$PreviousSalesPath = Join-Path $CacheDir "previous_sales_$SteamID.json"
 
 if (-not (Test-Path $CacheDir)) {
     New-Item -ItemType Directory -Path $CacheDir -Force | Out-Null
@@ -89,6 +90,7 @@ if (-not (Test-Path $CacheDir)) {
 
 if ($ClearCache -and (Test-Path $CachePath)) {
     Remove-Item $CachePath -Force
+    if (Test-Path $PreviousSalesPath) { Remove-Item $PreviousSalesPath -Force }
     Write-Warn 'Cache supprime.'
 }
 
@@ -278,7 +280,56 @@ foreach ($AppId in $AllPrices.Keys) {
 $Games = $Games | Sort-Object { $_.Name.ToLower() }
 
 # ==================================================================
-# STEP 4: Generate HTML page
+# STEP 4: Compare with previous scan (badges New / Price changes)
+# ==================================================================
+$PreviousSales = @{}
+if (Test-Path $PreviousSalesPath) {
+    try {
+        $PrevRaw = Get-Content $PreviousSalesPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        foreach ($prop in $PrevRaw.PSObject.Properties) {
+            $PreviousSales[$prop.Name] = [int]$prop.Value
+        }
+        Write-Step "Comparaison avec le scan precedent..."
+    } catch {
+        $PreviousSales = @{}
+    }
+}
+
+$NewCount = 0; $UpCount = 0; $DownCount = 0
+foreach ($Game in $Games) {
+    $aid = [string]$Game.AppId
+    if ($PreviousSales.Count -eq 0) {
+        $Game | Add-Member -NotePropertyName Badge -NotePropertyValue '' -Force
+    } elseif (-not $PreviousSales.ContainsKey($aid)) {
+        $Game | Add-Member -NotePropertyName Badge -NotePropertyValue 'new' -Force
+        $NewCount++
+    } elseif ($Game.SalePrice -gt $PreviousSales[$aid]) {
+        $Game | Add-Member -NotePropertyName Badge -NotePropertyValue 'price_up' -Force
+        $UpCount++
+    } elseif ($Game.SalePrice -lt $PreviousSales[$aid]) {
+        $Game | Add-Member -NotePropertyName Badge -NotePropertyValue 'price_down' -Force
+        $DownCount++
+    } else {
+        $Game | Add-Member -NotePropertyName Badge -NotePropertyValue '' -Force
+    }
+}
+
+if ($PreviousSales.Count -gt 0) {
+    Write-Ok "Badges : $NewCount nouveau(x), $UpCount prix en hausse, $DownCount prix en baisse"
+} else {
+    Write-Step "Premier scan : pas de donnees precedentes pour comparaison."
+}
+
+# Save current prices for next scan comparison
+$CurrentSales = @{}
+foreach ($Game in $Games) {
+    $CurrentSales[[string]$Game.AppId] = $Game.SalePrice
+}
+$CurrentSales | ConvertTo-Json -Depth 5 | Set-Content -Path $PreviousSalesPath -Encoding UTF8
+Write-Ok "Prix sauvegardes pour comparaison future"
+
+# ==================================================================
+# STEP 5: Generate HTML page
 # ==================================================================
 Write-Step 'Generation de la page HTML...'
 
@@ -327,9 +378,18 @@ foreach ($Game in $Games) {
         }
     }
 
+    $StatusBadgeHtml = ''
+    switch ($Game.Badge) {
+        'new'        { $StatusBadgeHtml = '<span class="status-badge new-badge">NEW</span>' }
+        'price_up'   { $StatusBadgeHtml = '<span class="status-badge up-badge">Prix &#128316;</span>' }
+        'price_down' { $StatusBadgeHtml = '<span class="status-badge down-badge">Prix &#128317;</span>' }
+    }
+
+    $BadgeClass = if ($Game.DiscountPct -ge 70) { 'badge-high' } elseif ($Game.DiscountPct -ge 30) { 'badge-mid' } else { 'badge-low' }
+
     $CardsHtml += @"
-<a class="card" data-name="$SafeNameAttr" data-sale="$($Game.SalePrice)" data-disc="$($Game.DiscountPct)" data-genres="$GenresData" href="https://store.steampowered.com/app/$($Game.AppId)" target="_blank" rel="noopener">
-<div class="img-wrap"><img src="$($Game.Image)" alt="$SafeNameAttr" loading="lazy" /><span class="badge">-$($Game.DiscountPct)%</span></div>
+<a class="card" data-name="$SafeNameAttr" data-sale="$($Game.SalePrice)" data-disc="$($Game.DiscountPct)" data-genres="$GenresData" data-badge="$($Game.Badge)" href="https://store.steampowered.com/app/$($Game.AppId)" target="_blank" rel="noopener">
+<div class="img-wrap"><img src="$($Game.Image)" alt="$SafeNameAttr" loading="lazy" /><span class="badge $BadgeClass">-$($Game.DiscountPct)%</span>$StatusBadgeHtml</div>
 <div class="info"><div class="name">$SafeName</div><div class="genres-row">$GenreTagsHtml</div><div class="prices"><span class="old">$NormalFmt$CurrSymbol</span><span class="new">$SaleFmt$CurrSymbol</span></div></div></a>
 "@
 }
@@ -372,13 +432,23 @@ $Html = @"
     .genre-btn { background: rgba(164,208,7,0.06); border: 1px solid rgba(164,208,7,0.12); color: #6a7a58; padding: 5px 14px; border-radius: 20px; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; font-family: 'Outfit', sans-serif; }
     .genre-btn:hover { background: rgba(164,208,7,0.14); color: #a4d007; }
     .genre-btn.active { background: linear-gradient(135deg, #a4d007, #7aa800); color: #fff; border-color: transparent; font-weight: 600; }
+    .new-only-btn.active { background: linear-gradient(135deg, #66c0f4, #4a9fd4); }
+    .clear-cache-btn { display: inline-flex; align-items: center; gap: 5px; background: rgba(224, 90, 79, 0.08); border: 1px solid rgba(224, 90, 79, 0.2); color: #e05a4f; padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; font-family: 'Outfit', sans-serif; cursor: pointer; transition: all 0.25s; }
+    .clear-cache-btn:hover { background: rgba(224, 90, 79, 0.18); color: #fff; border-color: #e05a4f; }
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
     .card { background: linear-gradient(160deg, #141c27 0%, #0f1923 100%); border-radius: 10px; overflow: hidden; text-decoration: none; color: inherit; transition: transform 0.25s ease, box-shadow 0.25s ease; display: flex; flex-direction: column; border: 1px solid rgba(102,192,244,0.05); opacity: 0; animation: fadeSlideUp 0.4s ease forwards; }
     .card:hover { transform: translateY(-5px) scale(1.01); box-shadow: 0 12px 35px rgba(0,0,0,0.5), 0 0 20px rgba(102,192,244,0.06); }
     .img-wrap { position: relative; aspect-ratio: 460/215; overflow: hidden; background: #080c12; }
     .img-wrap img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s ease; }
     .card:hover .img-wrap img { transform: scale(1.07); }
-    .badge { position: absolute; top: 0; right: 0; background: linear-gradient(135deg, #a4d007, #7aa800); color: #fff; font-family: 'Exo 2', sans-serif; font-weight: 800; font-size: 0.92rem; padding: 5px 12px 5px 14px; border-radius: 0 0 0 10px; letter-spacing: -0.03em; text-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+    .badge { position: absolute; top: 0; right: 0; color: #fff; font-family: 'Exo 2', sans-serif; font-weight: 800; font-size: 0.92rem; padding: 5px 12px 5px 14px; border-radius: 0 0 0 10px; letter-spacing: -0.03em; text-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+    .badge-high { background: linear-gradient(135deg, #a4d007, #7aa800); }
+    .badge-mid { background: linear-gradient(135deg, #f39c12, #d68910); }
+    .badge-low { background: linear-gradient(135deg, #e05a4f, #c0392b); }
+    .status-badge { position: absolute; top: 0; left: 0; color: #fff; font-family: 'Exo 2', sans-serif; font-weight: 700; font-size: 0.72rem; padding: 4px 10px 4px 8px; border-radius: 0 0 10px 0; text-shadow: 0 1px 2px rgba(0,0,0,0.4); z-index: 2; letter-spacing: 0.02em; }
+    .new-badge { background: linear-gradient(135deg, #66c0f4, #4a9fd4); }
+    .up-badge { background: linear-gradient(135deg, #e05a4f, #c0392b); }
+    .down-badge { background: linear-gradient(135deg, #27ae60, #1e8449); }
     .info { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 5px; flex: 1; }
     .name { font-size: 0.92rem; font-weight: 600; color: #fff; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .genres-row { display: flex; gap: 4px; flex-wrap: wrap; min-height: 18px; }
@@ -387,7 +457,7 @@ $Html = @"
     .old { font-size: 0.8rem; color: #6a7a88; text-decoration: line-through; }
     .new { font-family: 'Exo 2', sans-serif; font-size: 1.08rem; font-weight: 800; color: #a4d007; text-shadow: 0 0 10px rgba(164,208,7,0.15); }
     @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
-    @media (max-width: 640px) { .container { padding: 14px 10px; } .header h1 { font-size: 1.3rem; } .grid { grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 8px; } .info { padding: 8px 10px 10px; } .name { font-size: 0.82rem; } .badge { font-size: 0.8rem; padding: 3px 9px 3px 11px; } .stats { gap: 12px; font-size: 0.75rem; } }
+    @media (max-width: 640px) { .container { padding: 14px 10px; } .header h1 { font-size: 1.3rem; } .grid { grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 8px; } .info { padding: 8px 10px 10px; } .name { font-size: 0.82rem; } .badge { font-size: 0.8rem; padding: 3px 9px 3px 11px; } .status-badge { font-size: 0.62rem; padding: 3px 7px 3px 5px; } .stats { gap: 12px; font-size: 0.75rem; } }
 
     /* CLASSIC STEAM THEME */
     body.classic { background: #3b4a36; color: #d2d2d2; font-family: Tahoma, Verdana, Arial, sans-serif; }
@@ -411,12 +481,22 @@ $Html = @"
     body.classic .genre-btn { background: linear-gradient(180deg, #4a5a42 0%, #3e4e38 100%); border: 1px solid #5a6a52; color: #8a9a80; border-radius: 2px; padding: 3px 10px; font-family: Tahoma, sans-serif; font-size: 0.68rem; }
     body.classic .genre-btn:hover { color: #d2e8b0; }
     body.classic .genre-btn.active { background: linear-gradient(180deg, #7a9a64 0%, #5a7a47 100%); color: #fff; border-color: #8aaa74; }
+    body.classic .new-only-btn.active { background: linear-gradient(180deg, #4a8ab5 0%, #3a6a95 100%); border-color: #5a9ac5; }
+    body.classic .clear-cache-btn { background: linear-gradient(180deg, #8a4a42 0%, #6a3a32 100%); border: 1px solid #9a5a52; border-bottom: 1px solid #5a2a22; color: #e8c0b0; border-radius: 3px; padding: 3px 12px; font-family: Tahoma, sans-serif; font-size: 0.72rem; }
+    body.classic .clear-cache-btn:hover { background: linear-gradient(180deg, #9a5a52 0%, #7a4a42 100%); color: #fff; }
     body.classic .grid { gap: 8px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
     body.classic .card { background: linear-gradient(180deg, #4a5a42 0%, #3e4e38 100%); border: 1px solid #5a6a52; border-radius: 0; animation: none; opacity: 1; }
     body.classic .card:hover { transform: none; box-shadow: 0 0 0 1px #8aaa74; border-color: #8aaa74; }
     body.classic .card:hover .img-wrap img { transform: none; }
     body.classic .img-wrap { background: #2d3a28; }
-    body.classic .badge { background: #4a7a20; border-radius: 0; font-family: Tahoma, sans-serif; font-size: 0.82rem; font-weight: bold; padding: 2px 8px; }
+    body.classic .badge { border-radius: 0; font-family: Tahoma, sans-serif; font-size: 0.82rem; font-weight: bold; padding: 2px 8px; }
+    body.classic .badge-high { background: #4a7a20; }
+    body.classic .badge-mid { background: #b8860b; }
+    body.classic .badge-low { background: #b03a2e; }
+    body.classic .status-badge { border-radius: 0; font-family: Tahoma, sans-serif; font-size: 0.68rem; font-weight: bold; padding: 2px 6px; }
+    body.classic .new-badge { background: #4a8ab5; }
+    body.classic .up-badge { background: #b03a2e; }
+    body.classic .down-badge { background: #1e8449; }
     body.classic .info { padding: 8px 10px 10px; gap: 4px; }
     body.classic .name { font-size: 0.8rem; font-weight: bold; font-family: Tahoma, sans-serif; color: #d2e8b0; }
     body.classic .genre-tag { font-size: 0.58rem; color: #8a9a80; background: rgba(0,0,0,0.2); border-radius: 2px; padding: 1px 5px; }
@@ -424,7 +504,7 @@ $Html = @"
     body.classic .new { font-family: Tahoma, sans-serif; font-size: 0.88rem; font-weight: bold; color: #a4d007; text-shadow: none; }
 </style>
 </head>
-<body>
+<body data-cache-path="$CachePath">
 <div class="container">
 <div class="header">
     <h1><span class="icon">&#127918;</span> Steam Wishlist &#8212; Promos</h1>
@@ -432,6 +512,7 @@ $Html = @"
         <span class="count" id="count">$SaleCount jeu$SaleCountPlural en promo</span>
         <span>Genere le $Now (${ElapsedSec}s)</span>
         <button class="theme-btn" id="themeToggle" onclick="toggleTheme()">&#128421; Classic Steam</button>
+        <button class="clear-cache-btn" onclick="clearCache()">&#128465; Vider le cache</button>
     </div>
 </div>
 <div class="stats">
@@ -451,6 +532,7 @@ $Html = @"
 </div>
 <div class="genre-filters" id="genreFilters">
     <button class="genre-btn active" data-genre="all">Tous</button>
+    <button class="genre-btn new-only-btn" id="newOnlyBtn" onclick="toggleNewOnly()">&#127381; Nouveaut&#233;s</button>
     $GenreButtonsHtml
 </div>
 <div class="grid" id="grid">
@@ -477,29 +559,42 @@ document.querySelectorAll('.toolbar button').forEach(btn => {
     });
 });
 let activeGenre = 'all';
+let showNewOnly = false;
 function applyFilters() {
     const q = document.getElementById('search').value.toLowerCase();
     let visible = 0;
     document.querySelectorAll('.card').forEach(c => {
         const name = c.querySelector('.name').textContent.toLowerCase();
         const genres = (c.dataset.genres || '').toLowerCase();
+        const badge = c.dataset.badge || '';
         const matchSearch = name.includes(q);
         const matchGenre = activeGenre === 'all' || genres.split(',').some(g => g.trim().toLowerCase() === activeGenre.toLowerCase());
-        const show = matchSearch && matchGenre;
+        const matchNew = !showNewOnly || badge === 'new';
+        const show = matchSearch && matchGenre && matchNew;
         c.style.display = show ? '' : 'none';
         if (show) visible++;
     });
     document.getElementById('count').textContent = visible + ' jeu' + (visible > 1 ? 'x' : '') + ' en promo';
 }
 document.getElementById('search').addEventListener('input', applyFilters);
-document.querySelectorAll('.genre-btn').forEach(btn => {
+document.querySelectorAll('.genre-btn:not(.new-only-btn)').forEach(btn => {
     btn.addEventListener('click', () => {
-        document.querySelectorAll('.genre-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.genre-btn:not(.new-only-btn)').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         activeGenre = btn.dataset.genre;
         applyFilters();
     });
 });
+function toggleNewOnly() {
+    showNewOnly = !showNewOnly;
+    const btn = document.getElementById('newOnlyBtn');
+    if (showNewOnly) { btn.classList.add('active'); } else { btn.classList.remove('active'); }
+    applyFilters();
+}
+function clearCache() {
+    var cachePath = document.body.dataset.cachePath || '';
+    alert('Pour vider le cache, relancez le script avec le parametre -ClearCache :\n\n.\\SteamWishlistSales.ps1 -SteamID VOTRE_ID -ClearCache\n\n' + (cachePath ? 'Fichier cache : ' + cachePath : 'Le prochain scan sera plus long car toutes les informations devront etre recuperees a nouveau.'));
+}
 function toggleTheme() {
     const body = document.body;
     const btn = document.getElementById('themeToggle');
