@@ -42,7 +42,7 @@ Automatically monitors your Steam wishlist and displays discounted games on a sl
 ## Quick Install (Linux)
 
 ```bash
-git clone https://github.com/YOUR_USER/steam-wishlist-sales.git
+git clone https://github.com/W1p3out/steam-wishlist-sales-checker
 cd steam-wishlist-sales-checker
 chmod +x install.sh uninstall.sh
 ./install.sh
