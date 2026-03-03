@@ -39,12 +39,13 @@ Automatically monitors your Steam wishlist and displays games on sale on a sleek
 - **Windows 10/11** with **PowerShell 5.1+**
 - No other dependencies
 
-## Quick Install (Linux)
+## Quick Install (Linux as root user)
 
 ```bash
-git clone https://github.com/YOUR_USER/steam-wishlist-sales.git
+git clone https://github.com/W1p3out/steam-wishlist-sales-checker/
 cd steam-wishlist-sales
-sudo ./install.sh
+chmod +x install.sh
+./install.sh
 ```
 
 The installer will ask for:
