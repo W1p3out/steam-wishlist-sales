@@ -133,6 +133,14 @@ if [ ! -f "$WEB_DIR/cache.json" ]; then
     ok "Cache initialisé"
 fi
 
+# Initialiser le fichier de comparaison des prix si absent
+if [ ! -f "$WEB_DIR/previous_sales.json" ]; then
+    echo '{}' > "$WEB_DIR/previous_sales.json"
+    chmod 644 "$WEB_DIR/previous_sales.json"
+    chown www-data:www-data "$WEB_DIR/previous_sales.json"
+    ok "Fichier de comparaison initialisé"
+fi
+
 # ── Configuration du Steam ID ─────────────────────────────────
 log "Configuration du Steam ID..."
 
