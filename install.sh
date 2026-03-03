@@ -58,7 +58,7 @@ echo ""
 
 # Steam ID
 while true; do
-    read -p "  Steam ID (ex: 12345678901234567) : " STEAM_ID
+    read -p "  Steam ID (ex: 76561198040773990) : " STEAM_ID
     if [[ "$STEAM_ID" =~ ^[0-9]{17}$ ]]; then
         break
     fi
@@ -145,8 +145,10 @@ fi
 log "Configuration du Steam ID..."
 
 sed -i "s/^STEAM_ID=.*/STEAM_ID=\"${STEAM_ID}\"/" "$INSTALL_DIR/steam-wishlist-sales.sh"
+sed -i "s/^SCAN_HOURS=.*/SCAN_HOURS=\"${CRON_HOURS}\"/" "$INSTALL_DIR/steam-wishlist-sales.sh"
 
 ok "Steam ID configuré : $STEAM_ID"
+ok "Heures de scan configurées : ${CRON_HOURS}"
 
 # ── Configuration Apache ──────────────────────────────────────
 log "Configuration d'Apache..."
