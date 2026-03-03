@@ -12,6 +12,7 @@ Automatically monitors your Steam wishlist and displays games on sale on a sleek
 
 - **Automatic scanning** of your wishlist via the Steam API (every 6 hours by default)
 - **Tracking badges**: blue **NEW** badge for newly discounted games, red **Price 🔼** if price went up, green **Price 🔽** if price dropped since last scan
+- **Filter new only** : show only new discounted games
 - **Smart cache**: only new sale entries trigger API calls; everything else is read from local cache (5x faster scans)
 - **Clear cache button** (Linux/PHP): one click to reset everything, with confirmation dialog
 - **Genre filters**: Action, RPG, Indie... combinable with text search
