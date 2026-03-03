@@ -7,9 +7,20 @@ $script     = '/opt/steam-wishlist-sales/steam-wishlist-sales.sh';
 $indexFile  = __DIR__ . '/index.html';
 $currentLog = '/tmp/steam-wishlist-current.log';
 $lockFile   = '/tmp/steam-wishlist-sales.lock';
+$cacheFile  = __DIR__ . '/cache.json';
+$prevSalesFile = __DIR__ . '/previous_sales.json';
 
 if (!file_exists($script)) {
     die("Erreur : script introuvable.");
+}
+
+// Si demande de vidage du cache (sans relancer de scan)
+if (isset($_GET['clear-cache']) && $_GET['clear-cache'] === '1') {
+    if (file_exists($cacheFile)) { unlink($cacheFile); }
+    if (file_exists($prevSalesFile)) { unlink($prevSalesFile); }
+    header('Content-Type: text/plain');
+    echo 'Cache vidé.';
+    exit;
 }
 
 // Si un scan tourne déjà, rediriger directement vers update.php
