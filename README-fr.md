@@ -39,12 +39,13 @@ Surveille automatiquement votre wishlist Steam et affiche les jeux en promotion 
 - **Windows 10/11** avec **PowerShell 5.1+**
 - Aucune autre dependance
 
-## Installation rapide (Linux)
+## Installation rapide (Linux en utilisateur root)
 
 ```bash
-git clone https://github.com/VOTRE_USER/steam-wishlist-sales.git
+git clone https://github.com/W1p3out/steam-wishlist-sales-checkersteam-wishlist-sales.git
 cd steam-wishlist-sales
-sudo ./install.sh
+chmod +x install.sh
+./install.sh
 ```
 
 Le script d'installation vous demandera :
