@@ -12,6 +12,7 @@ Surveille automatiquement votre wishlist Steam et affiche les jeux en promotion 
 
 - **Scan automatique** de la wishlist via l'API Steam (toutes les 6h par defaut)
 - **Badges de suivi** : badge bleu **NEW** pour les nouveaux jeux en promo, badge rouge **Prix 🔼** si le prix a augmente, badge vert **Prix 🔽** si le prix a baisse depuis le dernier scan
+- **Filtrage par nouveautés** : filtre uniquement les nouveaux jeux en promotion
 - **Cache intelligent** : seuls les nouveaux jeux en promo sont recuperes, les autres sont lus depuis le cache local (scan 5x plus rapide)
 - **Bouton vider le cache** (Linux/PHP) : un clic pour tout reinitialiser, avec confirmation
 - **Filtres par genre** : Action, RPG, Indie... combinables avec la recherche textuelle
