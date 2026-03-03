@@ -25,6 +25,7 @@ STEAM_ID="VOTRE_STEAM_ID"
 OUTPUT_DIR="/var/www/steam-wishlist-sales"
 OUTPUT_FILE="${OUTPUT_DIR}/index.html"
 CACHE_FILE="${OUTPUT_DIR}/cache.json"
+PREVIOUS_SALES_FILE="${OUTPUT_DIR}/previous_sales.json"
 TEMP_DIR="/tmp/steam-wishlist-$$"
 LOCK_FILE="/tmp/steam-wishlist-sales.lock"
 BATCH_SIZE=30
@@ -284,7 +285,51 @@ if [ "$SALE_COUNT" -gt 0 ]; then
 fi
 
 # ═══════════════════════════════════════════════════════════════
-# ÉTAPE 5 : Générer la page HTML finale
+# ÉTAPE 5 : Comparer avec le scan précédent (badges New / Prix)
+# ═══════════════════════════════════════════════════════════════
+if [ -f "$PREVIOUS_SALES_FILE" ]; then
+    log "Comparaison avec le scan précédent..."
+    # Ajouter un champ "badge" à chaque jeu
+    BADGED_FILE="$TEMP_DIR/sales_badged.json"
+    jq --slurpfile prev "$PREVIOUS_SALES_FILE" '
+      ($prev[0] // {}) as $old |
+      [
+        .[] |
+        .appid as $id |
+        if ($old[$id] == null) then
+          . + { badge: "new" }
+        elif (.sale_price > $old[$id]) then
+          . + { badge: "price_up" }
+        elif (.sale_price < $old[$id]) then
+          . + { badge: "price_down" }
+        else
+          . + { badge: "" }
+        end
+      ]
+    ' "$SALES_FILE" > "$BADGED_FILE" 2>/dev/null
+    if [ -s "$BADGED_FILE" ]; then
+        mv "$BADGED_FILE" "$SALES_FILE"
+        NEW_COUNT=$(jq '[.[] | select(.badge == "new")] | length' "$SALES_FILE" 2>/dev/null || echo "0")
+        UP_COUNT=$(jq '[.[] | select(.badge == "price_up")] | length' "$SALES_FILE" 2>/dev/null || echo "0")
+        DOWN_COUNT=$(jq '[.[] | select(.badge == "price_down")] | length' "$SALES_FILE" 2>/dev/null || echo "0")
+        ok "Badges : $NEW_COUNT nouveau(x), $UP_COUNT prix en hausse, $DOWN_COUNT prix en baisse"
+    fi
+else
+    log "Premier scan : pas de données précédentes pour comparaison."
+    # Ajouter un badge vide à tous les jeux
+    jq '[ .[] | . + { badge: "" } ]' "$SALES_FILE" > "$TEMP_DIR/sales_nb.json" 2>/dev/null
+    if [ -s "$TEMP_DIR/sales_nb.json" ]; then
+        mv "$TEMP_DIR/sales_nb.json" "$SALES_FILE"
+    fi
+fi
+
+# Sauvegarder les prix actuels pour le prochain scan
+jq '[ .[] | { key: .appid, value: .sale_price } ] | from_entries' "$SALES_FILE" > "$PREVIOUS_SALES_FILE" 2>/dev/null
+chmod 644 "$PREVIOUS_SALES_FILE"
+chown www-data:www-data "$PREVIOUS_SALES_FILE" 2>/dev/null
+
+# ═══════════════════════════════════════════════════════════════
+# ÉTAPE 6 : Générer la page HTML finale
 # ═══════════════════════════════════════════════════════════════
 ELAPSED=$(( $(date +%s) - START_TIME ))
 BEST_DISCOUNT=$(jq '[.[].discount_pct] | if length > 0 then max else 0 end' "$SALES_FILE" 2>/dev/null || echo "0")
@@ -305,17 +350,22 @@ done <<< "$ALL_GENRES"
 # Générer les cartes HTML avec data-genres
 CARDS_HTML=$(jq -r '
   .[] |
-  "<a class=\"card\" data-name=\"\(.name | gsub("\""; "&quot;"))\" data-sale=\"\(.sale_price)\" data-disc=\"\(.discount_pct)\" data-genres=\"\([.genres[]?] | join(","))\" href=\"https://store.steampowered.com/app/\(.appid)\" target=\"_blank\" rel=\"noopener\">"
+  (if .badge == "new" then "<span class=\"status-badge new-badge\">NEW</span>"
+   elif .badge == "price_up" then "<span class=\"status-badge up-badge\">Prix &#128316;</span>"
+   elif .badge == "price_down" then "<span class=\"status-badge down-badge\">Prix &#128317;</span>"
+   else "" end) as $status_html |
+  "<a class=\"card\" data-name=\"\(.name | gsub("\""; "&quot;"))\" data-sale=\"\(.sale_price)\" data-disc=\"\(.discount_pct)\" data-genres=\"\([.genres[]?] | join(","))\" data-badge=\"\(.badge // "")\" href=\"https://store.steampowered.com/app/\(.appid)\" target=\"_blank\" rel=\"noopener\">"
   + "<div class=\"img-wrap\">"
   + "<img src=\"\(.capsule)\" alt=\"\(.name | gsub("\""; "&quot;"))\" loading=\"lazy\" />"
-  + "<span class=\"badge\">-\(.discount_pct)%</span>"
+  + "<span class=\"badge " + (if .discount_pct >= 70 then "badge-high" elif .discount_pct >= 30 then "badge-mid" else "badge-low" end) + "\">-\(.discount_pct)%</span>"
+  + $status_html
   + "</div>"
   + "<div class=\"info\">"
   + "<div class=\"name\">\(.name | gsub("<"; "&lt;") | gsub(">"; "&gt;"))</div>"
   + "<div class=\"genres-row\">\([.genres[]?] | map("<span class=\"genre-tag\">" + (. | gsub("<"; "&lt;") | gsub(">"; "&gt;")) + "</span>") | join(""))</div>"
   + "<div class=\"prices\">"
-  + "<span class=\"old\">\(.normal_price / 100 | tostring | gsub("\\."; ",") | if test(",") then . else . + ",00" end)€</span>"
-  + "<span class=\"new\">\(.sale_price / 100 | tostring | gsub("\\."; ",") | if test(",") then . else . + ",00" end)€</span>"
+  + "<span class=\"old\">\(.normal_price / 100 | tostring | gsub("\\."; ",") | if test(",") then . else . + ",00" end)\u20ac</span>"
+  + "<span class=\"new\">\(.sale_price / 100 | tostring | gsub("\\."; ",") | if test(",") then . else . + ",00" end)\u20ac</span>"
   + "</div>"
   + "</div></a>"
 ' "$SALES_FILE")
@@ -390,6 +440,7 @@ cat > "$OUTPUT_FILE" << 'HTMLHEAD'
     .genre-btn { background: rgba(164, 208, 7, 0.06); border: 1px solid rgba(164, 208, 7, 0.12); color: #6a7a58; padding: 5px 14px; border-radius: 20px; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; font-family: 'Outfit', sans-serif; }
     .genre-btn:hover { background: rgba(164, 208, 7, 0.14); color: #a4d007; }
     .genre-btn.active { background: linear-gradient(135deg, #a4d007, #7aa800); color: #fff; border-color: transparent; font-weight: 600; }
+    .new-only-btn.active { background: linear-gradient(135deg, #66c0f4, #4a9fd4); }
 
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
 
@@ -400,7 +451,18 @@ cat > "$OUTPUT_FILE" << 'HTMLHEAD'
     .img-wrap img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s ease; }
     .card:hover .img-wrap img { transform: scale(1.07); }
 
-    .badge { position: absolute; top: 0; right: 0; background: linear-gradient(135deg, #a4d007, #7aa800); color: #fff; font-family: 'Exo 2', sans-serif; font-weight: 800; font-size: 0.92rem; padding: 5px 12px 5px 14px; border-radius: 0 0 0 10px; letter-spacing: -0.03em; text-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+    .badge { position: absolute; top: 0; right: 0; color: #fff; font-family: 'Exo 2', sans-serif; font-weight: 800; font-size: 0.92rem; padding: 5px 12px 5px 14px; border-radius: 0 0 0 10px; letter-spacing: -0.03em; text-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+    .badge-high { background: linear-gradient(135deg, #a4d007, #7aa800); }
+    .badge-mid { background: linear-gradient(135deg, #f39c12, #d68910); }
+    .badge-low { background: linear-gradient(135deg, #e05a4f, #c0392b); }
+
+    .status-badge { position: absolute; top: 0; left: 0; color: #fff; font-family: 'Exo 2', sans-serif; font-weight: 700; font-size: 0.72rem; padding: 4px 10px 4px 8px; border-radius: 0 0 10px 0; text-shadow: 0 1px 2px rgba(0,0,0,0.4); z-index: 2; letter-spacing: 0.02em; }
+    .new-badge { background: linear-gradient(135deg, #66c0f4, #4a9fd4); }
+    .up-badge { background: linear-gradient(135deg, #e05a4f, #c0392b); }
+    .down-badge { background: linear-gradient(135deg, #27ae60, #1e8449); }
+
+    .clear-cache-btn { display: inline-flex; align-items: center; gap: 5px; background: rgba(224, 90, 79, 0.08); border: 1px solid rgba(224, 90, 79, 0.2); color: #e05a4f; padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; font-family: 'Outfit', sans-serif; cursor: pointer; transition: all 0.25s; }
+    .clear-cache-btn:hover { background: rgba(224, 90, 79, 0.18); color: #fff; border-color: #e05a4f; }
 
     .info { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 5px; flex: 1; }
     .name { font-size: 0.92rem; font-weight: 600; color: #fff; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -421,6 +483,7 @@ cat > "$OUTPUT_FILE" << 'HTMLHEAD'
         .info { padding: 8px 10px 10px; }
         .name { font-size: 0.82rem; }
         .badge { font-size: 0.8rem; padding: 3px 9px 3px 11px; }
+        .status-badge { font-size: 0.62rem; padding: 3px 7px 3px 5px; }
         .stats { gap: 12px; font-size: 0.75rem; }
     }
 
@@ -532,6 +595,7 @@ cat > "$OUTPUT_FILE" << 'HTMLHEAD'
         color: #fff;
         border-color: #8aaa74;
     }
+    body.classic .new-only-btn.active { background: linear-gradient(180deg, #4a8ab5 0%, #3a6a95 100%); border-color: #5a9ac5; }
 
     body.classic .grid { gap: 8px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 
@@ -552,13 +616,32 @@ cat > "$OUTPUT_FILE" << 'HTMLHEAD'
     body.classic .img-wrap { background: #2d3a28; }
 
     body.classic .badge {
-        background: #4a7a20;
         border-radius: 0;
         font-family: Tahoma, sans-serif;
         font-size: 0.82rem;
         font-weight: bold;
         padding: 2px 8px;
     }
+    body.classic .badge-high { background: #4a7a20; }
+    body.classic .badge-mid { background: #b8860b; }
+    body.classic .badge-low { background: #b03a2e; }
+
+    body.classic .status-badge { border-radius: 0; font-family: Tahoma, sans-serif; font-size: 0.68rem; font-weight: bold; padding: 2px 6px; }
+    body.classic .new-badge { background: #4a8ab5; }
+    body.classic .up-badge { background: #b03a2e; }
+    body.classic .down-badge { background: #1e8449; }
+
+    body.classic .clear-cache-btn {
+        background: linear-gradient(180deg, #8a4a42 0%, #6a3a32 100%);
+        border: 1px solid #9a5a52;
+        border-bottom: 1px solid #5a2a22;
+        color: #e8c0b0;
+        border-radius: 3px;
+        padding: 3px 12px;
+        font-family: Tahoma, sans-serif;
+        font-size: 0.72rem;
+    }
+    body.classic .clear-cache-btn:hover { background: linear-gradient(180deg, #9a5a52 0%, #7a4a42 100%); color: #fff; }
 
     body.classic .info { padding: 8px 10px 10px; gap: 4px; }
     body.classic .name { font-size: 0.8rem; font-weight: bold; font-family: Tahoma, sans-serif; color: #d2e8b0; }
@@ -580,6 +663,7 @@ cat >> "$OUTPUT_FILE" << HTMLMETA
         <span class="count" id="count">${SALE_COUNT} jeu$([ "$SALE_COUNT" -gt 1 ] && echo "x") en promo</span>
         <span>Mis à jour le ${NOW} (${ELAPSED}s)</span>
         <button class="theme-btn" id="themeToggle" onclick="toggleTheme()">🖥️ Classic Steam</button>
+        <button class="clear-cache-btn" onclick="clearCache()">🗑️ Vider le cache</button>
         <a class="refresh-btn" href="run.php">
             <span class="refresh-icon">↻</span>
             Actualiser
@@ -609,6 +693,7 @@ cat >> "$OUTPUT_FILE" << HTMLMETA
 
 <div class="genre-filters" id="genreFilters">
     <button class="genre-btn active" data-genre="all">Tous</button>
+    <button class="genre-btn new-only-btn" id="newOnlyBtn" onclick="toggleNewOnly()">🆕 Nouveautés</button>
     ${GENRE_BUTTONS}
 </div>
 HTMLMETA
@@ -664,9 +749,11 @@ function applyFilters() {
     document.querySelectorAll('.card').forEach(c => {
         const name = c.querySelector('.name').textContent.toLowerCase();
         const genres = (c.dataset.genres || '').toLowerCase();
+        const badge = c.dataset.badge || '';
         const matchSearch = name.includes(q);
         const matchGenre = activeGenre === 'all' || genres.split(',').some(g => g.trim().toLowerCase() === activeGenre.toLowerCase());
-        const show = matchSearch && matchGenre;
+        const matchNew = !showNewOnly || badge === 'new';
+        const show = matchSearch && matchGenre && matchNew;
         c.style.display = show ? '' : 'none';
         if (show) visible++;
     });
@@ -675,14 +762,36 @@ function applyFilters() {
 
 document.getElementById('search').addEventListener('input', applyFilters);
 
-document.querySelectorAll('.genre-btn').forEach(btn => {
+document.querySelectorAll('.genre-btn:not(.new-only-btn)').forEach(btn => {
     btn.addEventListener('click', () => {
-        document.querySelectorAll('.genre-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.genre-btn:not(.new-only-btn)').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         activeGenre = btn.dataset.genre;
         applyFilters();
     });
 });
+
+// ── Vider le cache ──
+function clearCache() {
+    if (confirm('⚠️ Vider le cache ?\n\nLe prochain scan sera plus long car toutes les informations des jeux devront être récupérées à nouveau depuis Steam.\n\nContinuer ?')) {
+        fetch('run.php?clear-cache=1').then(function() {
+            var btn = document.querySelector('.clear-cache-btn');
+            btn.textContent = '✅ Cache vidé !';
+            btn.style.color = '#a4d007';
+            btn.style.borderColor = 'rgba(164,208,7,0.3)';
+            setTimeout(function() { btn.innerHTML = '🗑️ Vider le cache'; btn.style.color = ''; btn.style.borderColor = ''; }, 3000);
+        });
+    }
+}
+
+// ── Filtre Nouveautés ──
+let showNewOnly = false;
+function toggleNewOnly() {
+    showNewOnly = !showNewOnly;
+    const btn = document.getElementById('newOnlyBtn');
+    if (showNewOnly) { btn.classList.add('active'); } else { btn.classList.remove('active'); }
+    applyFilters();
+}
 
 // ── Switch de thème (Modern ↔ Classic Steam) ──
 function toggleTheme() {
