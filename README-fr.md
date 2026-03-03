@@ -1,4 +1,4 @@
-# 🎮 Steam Wishlist Sales Checker (v1.1)
+# 🎮 Steam Wishlist Sales Checker (v1.2)
 
 Code généré par Claude (Anthropic). Ceci est un projet pour comprendre la possibilité de récupérer des informations avec la commande "curl" et "Invoke-RestMethod" via l'API Steam.
 Une version exécutable pour Windows est également disponible sans aucune installation pour simplement vérifier les promotions de votre liste de souhaits Steam, dans la page "Releases".
@@ -11,7 +11,9 @@ Surveille automatiquement votre wishlist Steam et affiche les jeux en promotion 
 ## Fonctionnalites
 
 - **Scan automatique** de la wishlist via l'API Steam (toutes les 6h par defaut)
+- **Badges de suivi** : badge bleu **NEW** pour les nouveaux jeux en promo, badge rouge **Prix 🔼** si le prix a augmente, badge vert **Prix 🔽** si le prix a baisse depuis le dernier scan
 - **Cache intelligent** : seuls les nouveaux jeux en promo sont recuperes, les autres sont lus depuis le cache local (scan 5x plus rapide)
+- **Bouton vider le cache** (Linux/PHP) : un clic pour tout reinitialiser, avec confirmation
 - **Filtres par genre** : Action, RPG, Indie... combinables avec la recherche textuelle
 - **Double theme** : Modern (par defaut) ou Classic Steam retro (2004-2010), persistant via cookie
 - **Page web auto-hebergee** avec un design inspire de Steam
@@ -21,7 +23,7 @@ Surveille automatiquement votre wishlist Steam et affiche les jeux en promotion 
 - **Statistiques** : nombre de promos, meilleure remise, prix le plus bas, prochain scan
 - **Responsive** : s'adapte au mobile et au desktop
 - **Leger** : page HTML statique, pas de base de donnees
-- **Version Windows** : script PowerShell standalone inclus et exécutable à télécharger dans 'Releases'
+- **Version Windows** : script PowerShell standalone inclus
 
 ## Prerequis
 
@@ -37,20 +39,19 @@ Surveille automatiquement votre wishlist Steam et affiche les jeux en promotion 
 - **Windows 10/11** avec **PowerShell 5.1+**
 - Aucune autre dependance
 
-## Installation rapide (Linux - root user)
+## Installation rapide (Linux)
 
 ```bash
-git clone https://github.com/W1p3out/steam-wishlist-sales-checker
-cd steam-wishlist-sales-checker
-chmod +x install.sh
-./install.sh
+git clone https://github.com/VOTRE_USER/steam-wishlist-sales.git
+cd steam-wishlist-sales
+sudo ./install.sh
 ```
 
 Le script d'installation vous demandera :
 
 | Parametre | Description | Exemple |
 |---|---|---|
-| **Steam ID** | Votre identifiant Steam 64-bit (17 chiffres) | `12345678901234567` |
+| **Steam ID** | Votre identifiant Steam 64-bit (17 chiffres) | `76561198040773990` |
 | **Port** | Port du serveur web | `2251` |
 | **Heures de scan** | Heures de scan automatique (format cron) | `1,7,13,19` |
 
@@ -61,9 +62,9 @@ Le script d'installation vous demandera :
 ## Utilisation Windows (PowerShell)
 
 ```powershell
-.\SteamWishlistSales.ps1 -SteamID 12345678901234567
-.\SteamWishlistSales.ps1 -SteamID 12345678901234567 -Country us
-.\SteamWishlistSales.ps1 12345678901234567 -ClearCache
+.\SteamWishlistSales.ps1 -SteamID 76561198040773990
+.\SteamWishlistSales.ps1 -SteamID 76561198040773990 -Country us
+.\SteamWishlistSales.ps1 76561198040773990 -ClearCache
 ```
 
 Le script genere un fichier HTML dans `%TEMP%` et l'ouvre automatiquement dans le navigateur. Le cache est stocke dans `%APPDATA%\SteamWishlistSales\`.
