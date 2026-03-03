@@ -156,8 +156,6 @@ log "Configuration d'Apache..."
 VHOST_FILE="/etc/apache2/sites-available/steam-wishlist-sales.conf"
 
 cat > "$VHOST_FILE" << EOF
-Listen ${PORT}
-
 <VirtualHost *:${PORT}>
     DocumentRoot ${WEB_DIR}
     DirectoryIndex index.html
