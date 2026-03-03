@@ -1,4 +1,4 @@
-# 🎮 Steam Wishlist Sales Checker (v1.1)
+# 🎮 Steam Wishlist Sales Checker (v1.2)
 
 Code written with Claude (Anthropic). This is a learning project to see how "curl" and "Invoke-RestMethod" commands could grab informations from Steam API.
 An executable is also available for Windows if you want to simply scan your wishlist sales without any installation in releases page.
@@ -11,7 +11,9 @@ Automatically monitors your Steam wishlist and displays games on sale on a sleek
 ## Features
 
 - **Automatic scanning** of your wishlist via the Steam API (every 6 hours by default)
+- **Tracking badges**: blue **NEW** badge for newly discounted games, red **Price 🔼** if price went up, green **Price 🔽** if price dropped since last scan
 - **Smart cache**: only new sale entries trigger API calls; everything else is read from local cache (5x faster scans)
+- **Clear cache button** (Linux/PHP): one click to reset everything, with confirmation dialog
 - **Genre filters**: Action, RPG, Indie... combinable with text search
 - **Dual theme**: Modern (default) or Classic Steam retro (2004-2010), persisted via cookie
 - **Self-hosted web page** with a Steam-inspired design
@@ -21,7 +23,7 @@ Automatically monitors your Steam wishlist and displays games on sale on a sleek
 - **Statistics**: sale count, best discount, lowest price, next scan countdown
 - **Responsive**: adapts to mobile and desktop
 - **Lightweight**: static HTML page, no database required
-- **Windows version**: standalone PowerShell script included and executable in 'Releases'
+- **Windows version**: standalone PowerShell script included
 
 ## Requirements
 
@@ -40,17 +42,16 @@ Automatically monitors your Steam wishlist and displays games on sale on a sleek
 ## Quick Install (Linux)
 
 ```bash
-git clone https://github.com/W1p3out/steam-wishlist-sales-checker
-cd steam-wishlist-sales-checker
-chmod +x install.sh
-./install.sh
+git clone https://github.com/YOUR_USER/steam-wishlist-sales.git
+cd steam-wishlist-sales
+sudo ./install.sh
 ```
 
 The installer will ask for:
 
 | Parameter | Description | Example |
 |---|---|---|
-| **Steam ID** | Your 64-bit Steam ID (17 digits) | `12345678901234567` |
+| **Steam ID** | Your 64-bit Steam ID (17 digits) | `76561198040773990` |
 | **Port** | Web server port | `2251` |
 | **Scan hours** | Automatic scan schedule (cron format) | `1,7,13,19` |
 
@@ -61,9 +62,9 @@ The installer will ask for:
 ## Windows Usage (PowerShell)
 
 ```powershell
-.\SteamWishlistSales.ps1 -SteamID 12345678901234567
-.\SteamWishlistSales.ps1 -SteamID 12345678901234567 -Country us
-.\SteamWishlistSales.ps1 12345678901234567 -ClearCache
+.\SteamWishlistSales.ps1 -SteamID 76561198040773990
+.\SteamWishlistSales.ps1 -SteamID 76561198040773990 -Country us
+.\SteamWishlistSales.ps1 76561198040773990 -ClearCache
 ```
 
 The script generates an HTML file in `%TEMP%` and opens it in your default browser. Cache is stored in `%APPDATA%\SteamWishlistSales\`.
