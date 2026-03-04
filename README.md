@@ -274,6 +274,10 @@ sudo chown www-data:www-data /var/www/steam-wishlist-sales/cache.json
 - Check sudo permissions: `sudo -u www-data sudo /opt/steam-wishlist-sales/steam-wishlist-sales.sh`
 - Check logs: `tail -f /var/log/apache2/steam-wishlist-sales-error.log`
 
+### After scan, showing apache2 "It Works!"
+
+Refresh you browser. It should load your Steam Wishlist Sales Checker website.
+
 ### PowerShell parsing error
 
 The PowerShell script must be UTF-8 encoded with BOM. If you edit the file, save it as "UTF-8 with BOM" in your editor.
