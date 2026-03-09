@@ -2,7 +2,7 @@
 
 Code written with Claude (Anthropic). This is a learning project to see how "curl" and "Invoke-RestMethod" commands could grab informations from Steam API. An executable is also available for Windows if you want to simply scan your wishlist sales without any installation in releases page.
 
-Automatically monitors your Steam wishlist and displays discounted games on a sleek, self-hosted web page.
+Automatically monitors your Steam wishlist and displays discounted games on a sleek, self-hosted web page or using an executable without any installation.
 
 ![Steam Wishlist Sales](screenshots/result.png)
 ![Steam Wishlist Sales](screenshots/result-classic.png)
