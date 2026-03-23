@@ -31,6 +31,7 @@ LOCK_FILE="/tmp/steam-wishlist-sales.lock"
 BATCH_SIZE=30
 DELAY_SECONDS=2
 COUNTRY_CODE="fr"
+SCAN_HOURS="1,7,13,19"
 
 # ── Couleurs pour le log ──────────────────────────────────────
 RED='\033[0;31m'
@@ -236,7 +237,10 @@ if [ "$SALE_COUNT" -gt 0 ]; then
                         {
                             name: (.data.name // ""),
                             img: (.data.header_image // ""),
-                            genres: ([.data.genres[]?.description] | join(","))
+                            genres: ([.data.genres[]?.description] | join(",")),
+                            cats: ([.data.categories[]?.description] | join(",")),
+                            metacritic: (.data.metacritic.score // null),
+                            desc: (.data.short_description // "")
                         }
                     else null end
                 ' "$DETAIL_FILE" 2>/dev/null)
@@ -276,7 +280,10 @@ if [ "$SALE_COUNT" -gt 0 ]; then
         . + {
           name: (if $detail and $detail.name and ($detail.name | length > 0) then $detail.name else $game.name end),
           capsule: (if $detail and $detail.img and ($detail.img | length > 0) then $detail.img else $game.capsule end),
-          genres: (if $detail and $detail.genres and ($detail.genres | length > 0) then ($detail.genres | split(",")) else [] end)
+          genres: (if $detail and $detail.genres and ($detail.genres | length > 0) then ($detail.genres | split(",")) else [] end),
+          cats: (if $detail and $detail.cats and ($detail.cats | length > 0) then ($detail.cats | split(",")) else [] end),
+          metacritic: (if $detail then ($detail.metacritic // null) else null end),
+          desc: (if $detail then ($detail.desc // "") else "" end)
         }
       ]
       | sort_by(.name | ascii_downcase)
@@ -335,6 +342,8 @@ ELAPSED=$(( $(date +%s) - START_TIME ))
 BEST_DISCOUNT=$(jq '[.[].discount_pct] | if length > 0 then max else 0 end' "$SALES_FILE" 2>/dev/null || echo "0")
 CHEAPEST=$(jq '[.[].sale_price] | if length > 0 then min else 0 end' "$SALES_FILE" 2>/dev/null || echo "0")
 CHEAPEST_FMT=$(echo "scale=2; ${CHEAPEST:-0} / 100" | bc 2>/dev/null | sed 's/\./,/' || echo "0,00")
+MAX_PRICE=$(jq '[.[].sale_price] | if length > 0 then max else 0 end' "$SALES_FILE" 2>/dev/null || echo "0")
+MAX_PRICE_EUR=$(echo "scale=0; (${MAX_PRICE:-0} + 99) / 100" | bc 2>/dev/null || echo "0")
 NOW=$(date '+%d/%m/%Y à %H:%M')
 
 # Extraire la liste unique des genres pour les boutons filtres
@@ -347,6 +356,16 @@ while IFS= read -r genre; do
     fi
 done <<< "$ALL_GENRES"
 
+# Extraire les catégories de jeu (filtrer les catégories pertinentes)
+ALL_CATS=$(jq -r '[.[].cats[]?] | unique | .[]' "$SALES_FILE" 2>/dev/null | grep -v '^$' | grep -iE "single.player|multi.player|co.op|pvp|mmo|cross.platform|shared.split|lan" | sort)
+
+CAT_BUTTONS=""
+while IFS= read -r cat; do
+    if [ -n "$cat" ]; then
+        CAT_BUTTONS="${CAT_BUTTONS}<button class=\"cat-btn\" data-cat=\"${cat}\">${cat}</button>"
+    fi
+done <<< "$ALL_CATS"
+
 # Générer les cartes HTML avec data-genres
 CARDS_HTML=$(jq -r '
   .[] |
@@ -354,7 +373,8 @@ CARDS_HTML=$(jq -r '
    elif .badge == "price_up" then "<span class=\"status-badge up-badge\">Prix &#128316;</span>"
    elif .badge == "price_down" then "<span class=\"status-badge down-badge\">Prix &#128317;</span>"
    else "" end) as $status_html |
-  "<a class=\"card\" data-name=\"\(.name | gsub("\""; "&quot;"))\" data-sale=\"\(.sale_price)\" data-disc=\"\(.discount_pct)\" data-genres=\"\([.genres[]?] | join(","))\" data-badge=\"\(.badge // "")\" href=\"https://store.steampowered.com/app/\(.appid)\" target=\"_blank\" rel=\"noopener\">"
+  (if .metacritic then "<span class=\"metacritic " + (if .metacritic >= 75 then "mc-high" elif .metacritic >= 50 then "mc-mid" else "mc-low" end) + "\">" + (.metacritic | tostring) + "</span>" else "" end) as $mc_html |
+  "<a class=\"card\" data-name=\"\(.name | gsub("\""; "&quot;"))\" data-sale=\"\(.sale_price)\" data-disc=\"\(.discount_pct)\" data-genres=\"\([.genres[]?] | join(","))\" data-cats=\"\([.cats[]?] | join(","))\" data-badge=\"\(.badge // "")\" data-mc=\"\(.metacritic // 0)\" title=\"\(.desc | gsub("\""; "&quot;") | gsub("<[^>]*>"; ""))\" href=\"https://store.steampowered.com/app/\(.appid)\" target=\"_blank\" rel=\"noopener\">"
   + "<div class=\"img-wrap\">"
   + "<img src=\"\(.capsule)\" alt=\"\(.name | gsub("\""; "&quot;"))\" loading=\"lazy\" />"
   + "<span class=\"badge " + (if .discount_pct >= 70 then "badge-high" elif .discount_pct >= 30 then "badge-mid" else "badge-low" end) + "\">-\(.discount_pct)%</span>"
@@ -366,6 +386,7 @@ CARDS_HTML=$(jq -r '
   + "<div class=\"prices\">"
   + "<span class=\"old\">\(.normal_price / 100 | tostring | gsub("\\."; ",") | if test(",") then . else . + ",00" end)\u20ac</span>"
   + "<span class=\"new\">\(.sale_price / 100 | tostring | gsub("\\."; ",") | if test(",") then . else . + ",00" end)\u20ac</span>"
+  + $mc_html
   + "</div>"
   + "</div></a>"
 ' "$SALES_FILE")
@@ -442,6 +463,16 @@ cat > "$OUTPUT_FILE" << 'HTMLHEAD'
     .genre-btn.active { background: linear-gradient(135deg, #a4d007, #7aa800); color: #fff; border-color: transparent; font-weight: 600; }
     .new-only-btn.active { background: linear-gradient(135deg, #66c0f4, #4a9fd4); }
 
+    .cat-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+    .cat-btn { background: rgba(164, 208, 7, 0.06); border: 1px solid rgba(164, 208, 7, 0.14); color: #8f98a0; padding: 5px 14px; border-radius: 18px; font-size: 0.72rem; cursor: pointer; transition: all 0.2s; font-family: 'Outfit', sans-serif; }
+    .cat-btn:hover { background: rgba(164, 208, 7, 0.14); color: #fff; }
+    .cat-btn.active { background: linear-gradient(135deg, #a4d007, #7aa800); color: #fff; border-color: transparent; font-weight: 600; }
+
+    .cat-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+    .cat-btn { background: rgba(164, 208, 7, 0.06); border: 1px solid rgba(164, 208, 7, 0.14); color: #8f98a0; padding: 5px 12px; border-radius: 16px; font-size: 0.72rem; cursor: pointer; transition: all 0.2s; font-family: 'Outfit', sans-serif; }
+    .cat-btn:hover { background: rgba(164, 208, 7, 0.14); color: #fff; }
+    .cat-btn.active { background: linear-gradient(135deg, #a4d007, #7aa800); color: #fff; border-color: transparent; font-weight: 600; }
+
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
 
     .card { background: linear-gradient(160deg, #141c27 0%, #0f1923 100%); border-radius: 10px; overflow: hidden; text-decoration: none; color: inherit; transition: transform 0.25s ease, box-shadow 0.25s ease; display: flex; flex-direction: column; border: 1px solid rgba(102, 192, 244, 0.05); opacity: 0; animation: fadeSlideUp 0.4s ease forwards; }
@@ -471,6 +502,18 @@ cat > "$OUTPUT_FILE" << 'HTMLHEAD'
     .prices { display: flex; align-items: center; gap: 10px; margin-top: auto; }
     .old { font-size: 0.8rem; color: #6a7a88; text-decoration: line-through; }
     .new { font-family: 'Exo 2', sans-serif; font-size: 1.08rem; font-weight: 800; color: #a4d007; text-shadow: 0 0 10px rgba(164, 208, 7, 0.15); }
+
+    .metacritic { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 22px; font-family: 'Exo 2', sans-serif; font-weight: 800; font-size: 0.68rem; border-radius: 4px; color: #fff; margin-left: auto; padding: 0 5px; }
+    .mc-high { background: #66cc33; }
+    .mc-mid { background: #ffcc33; color: #111; }
+    .mc-low { background: #ff4444; }
+
+    .price-filter { display: flex; align-items: center; gap: 8px; margin-left: 8px; padding-left: 8px; border-left: 1px solid rgba(102,192,244,0.12); }
+    .price-filter label { font-size: 0.75rem; color: #8f98a0; font-family: 'Outfit', sans-serif; white-space: nowrap; }
+    .price-filter input[type=range] { -webkit-appearance: none; appearance: none; width: 100px; height: 4px; background: rgba(102, 192, 244, 0.15); border-radius: 2px; outline: none; }
+    .price-filter input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #66c0f4; cursor: pointer; border: 2px solid #0a0e14; }
+    .price-filter input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #66c0f4; cursor: pointer; border: 2px solid #0a0e14; }
+    .price-val { font-size: 0.78rem; color: #66c0f4; font-weight: 600; font-family: 'Exo 2', sans-serif; min-width: 40px; }
 
     .empty { text-align: center; padding: 80px 20px; color: #3e4f5e; font-size: 1.1rem; }
 
@@ -597,6 +640,16 @@ cat > "$OUTPUT_FILE" << 'HTMLHEAD'
     }
     body.classic .new-only-btn.active { background: linear-gradient(180deg, #4a8ab5 0%, #3a6a95 100%); border-color: #5a9ac5; }
 
+    body.classic .cat-filters { gap: 4px; margin-bottom: 10px; }
+    body.classic .cat-btn { background: linear-gradient(180deg, #3a4a30 0%, #2a3a20 100%); border: 1px solid #4a5a40; color: #8a9a80; border-radius: 3px; font-family: Tahoma, sans-serif; font-size: 0.68rem; padding: 3px 10px; }
+    body.classic .cat-btn:hover { color: #d2e8b0; }
+    body.classic .cat-btn.active { background: linear-gradient(180deg, #7a9a64 0%, #5a7a47 100%); color: #fff; border-color: #8aaa74; }
+
+    body.classic .cat-filters { margin-bottom: 10px; }
+    body.classic .cat-btn { background: linear-gradient(180deg, #4a5a3e 0%, #3a4a2e 100%); border: 1px solid #5a6a4e; border-bottom: 1px solid #2a3a1e; color: #8a9a80; border-radius: 3px; padding: 3px 10px; font-family: Tahoma, sans-serif; font-size: 0.68rem; }
+    body.classic .cat-btn:hover { color: #d2e8b0; }
+    body.classic .cat-btn.active { background: linear-gradient(180deg, #7a9a64 0%, #5a7a47 100%); color: #fff; border-color: #8aaa74; }
+
     body.classic .grid { gap: 8px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 
     body.classic .card {
@@ -648,6 +701,15 @@ cat > "$OUTPUT_FILE" << 'HTMLHEAD'
     body.classic .genre-tag { font-size: 0.58rem; color: #8a9a80; background: rgba(0,0,0,0.2); border-radius: 2px; padding: 1px 5px; }
     body.classic .old { font-size: 0.72rem; color: #8a9a80; }
     body.classic .new { font-family: Tahoma, sans-serif; font-size: 0.88rem; font-weight: bold; color: #a4d007; text-shadow: none; }
+
+    body.classic .metacritic { border-radius: 2px; font-family: Tahoma, sans-serif; font-size: 0.62rem; }
+
+    body.classic .price-filter { border-left-color: rgba(138,154,128,0.2); }
+    body.classic .price-filter label { font-family: Tahoma, sans-serif; font-size: 0.68rem; color: #8a9a80; }
+    body.classic .price-filter input[type=range] { background: rgba(138,154,128,0.2); }
+    body.classic .price-filter input[type=range]::-webkit-slider-thumb { background: #7a9a64; border-color: #1e2a16; }
+    body.classic .price-filter input[type=range]::-moz-range-thumb { background: #7a9a64; border-color: #1e2a16; }
+    body.classic .price-val { color: #a4d007; font-family: Tahoma, sans-serif; }
 </style>
 </head>
 <body>
@@ -685,9 +747,16 @@ cat >> "$OUTPUT_FILE" << HTMLMETA
     </div>
     <div class="toolbar">
         <button class="active" data-sort="alpha">A→Z</button>
+        <button data-sort="alpha_desc">Z→A</button>
         <button data-sort="price_asc">Prix ↑</button>
         <button data-sort="price_desc">Prix ↓</button>
         <button data-sort="discount">% Promo</button>
+        <button data-sort="metacritic">Metacritic</button>
+        <div class="price-filter">
+            <label>En dessous de</label>
+            <input type="range" id="priceMax" min="0" max="${MAX_PRICE_EUR}" value="${MAX_PRICE_EUR}" step="1">
+            <span class="price-val" id="priceLabel">${MAX_PRICE_EUR}€</span>
+        </div>
     </div>
 </div>
 
@@ -695,6 +764,11 @@ cat >> "$OUTPUT_FILE" << HTMLMETA
     <button class="genre-btn active" data-genre="all">Tous</button>
     <button class="genre-btn new-only-btn" id="newOnlyBtn" onclick="toggleNewOnly()">🆕 Nouveautés</button>
     ${GENRE_BUTTONS}
+</div>
+
+<div class="cat-filters" id="catFilters">
+    <button class="cat-btn active" data-cat="all">Tous</button>
+    ${CAT_BUTTONS}
 </div>
 HTMLMETA
 
@@ -706,6 +780,10 @@ else
     echo '<div class="empty">Aucun jeu en promotion dans votre wishlist pour le moment.</div>' >> "$OUTPUT_FILE"
 fi
 echo '</div>' >> "$OUTPUT_FILE"
+
+# ── JavaScript : injection des heures de scan (interpolé) ──
+SCAN_HOURS_JS=$(echo "$SCAN_HOURS" | tr ',' '\n' | sed 's/^//' | tr '\n' ',' | sed 's/,$//')
+echo "<script>var SCAN_SCHEDULE = [${SCAN_HOURS_JS}];</script>" >> "$OUTPUT_FILE"
 
 # ── JavaScript (non interpolé) ──
 cat >> "$OUTPUT_FILE" << 'HTMLSCRIPT'
@@ -727,9 +805,11 @@ document.querySelectorAll('.toolbar button').forEach(btn => {
         cards.sort((a, b) => {
             switch(mode) {
                 case 'alpha': return a.dataset.name.localeCompare(b.dataset.name, 'fr', {sensitivity:'base'});
+                case 'alpha_desc': return b.dataset.name.localeCompare(a.dataset.name, 'fr', {sensitivity:'base'});
                 case 'price_asc': return Number(a.dataset.sale) - Number(b.dataset.sale);
                 case 'price_desc': return Number(b.dataset.sale) - Number(a.dataset.sale);
                 case 'discount': return Number(b.dataset.disc) - Number(a.dataset.disc);
+                case 'metacritic': return Number(b.dataset.mc || 0) - Number(a.dataset.mc || 0);
             }
         });
         cards.forEach((c, i) => {
@@ -742,23 +822,32 @@ document.querySelectorAll('.toolbar button').forEach(btn => {
 
 // ── Filtres combinés (recherche + genre) ──
 let activeGenre = 'all';
+let activeCat = 'all';
 
 function applyFilters() {
     const q = document.getElementById('search').value.toLowerCase();
+    const pMax = parseInt(document.getElementById('priceMax').value) * 100;
+    document.getElementById('priceLabel').textContent = document.getElementById('priceMax').value + '\u20ac';
     let visible = 0;
     document.querySelectorAll('.card').forEach(c => {
         const name = c.querySelector('.name').textContent.toLowerCase();
         const genres = (c.dataset.genres || '').toLowerCase();
+        const cats = (c.dataset.cats || '').toLowerCase();
         const badge = c.dataset.badge || '';
+        const price = parseInt(c.dataset.sale) || 0;
         const matchSearch = name.includes(q);
         const matchGenre = activeGenre === 'all' || genres.split(',').some(g => g.trim().toLowerCase() === activeGenre.toLowerCase());
+        const matchCat = activeCat === 'all' || cats.split(',').some(ct => ct.trim().toLowerCase() === activeCat.toLowerCase());
         const matchNew = !showNewOnly || badge === 'new';
-        const show = matchSearch && matchGenre && matchNew;
+        const matchPrice = price <= pMax;
+        const show = matchSearch && matchGenre && matchCat && matchNew && matchPrice;
         c.style.display = show ? '' : 'none';
         if (show) visible++;
     });
     document.getElementById('count').textContent = visible + ' jeu' + (visible > 1 ? 'x' : '') + ' en promo';
 }
+
+document.getElementById('priceMax').addEventListener('input', applyFilters);
 
 document.getElementById('search').addEventListener('input', applyFilters);
 
@@ -767,6 +856,15 @@ document.querySelectorAll('.genre-btn:not(.new-only-btn)').forEach(btn => {
         document.querySelectorAll('.genre-btn:not(.new-only-btn)').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         activeGenre = btn.dataset.genre;
+        applyFilters();
+    });
+});
+
+document.querySelectorAll('.cat-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeCat = btn.dataset.cat;
         applyFilters();
     });
 });
@@ -817,9 +915,9 @@ function toggleTheme() {
     }
 })();
 
-// ── Prochain scan auto (1h05, 7h05, 13h05, 19h05) ──
+// ── Prochain scan auto ──
 (function() {
-    const schedules = [1, 7, 13, 19];
+    const schedules = SCAN_SCHEDULE || [1, 7, 13, 19];
     const now = new Date();
     let next = null;
     for (const h of schedules) {

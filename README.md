@@ -1,11 +1,10 @@
-# 🎮 Steam Wishlist Sales (v1.2)
+# 🎮 Steam Wishlist Sales (v1.3)
 
 Code written with Claude (Anthropic). This is a learning project to see how "curl" and "Invoke-RestMethod" commands could grab informations from Steam API. An executable is also available for Windows if you want to simply scan your wishlist sales without any installation in releases page.
 
-Automatically monitors your Steam wishlist and displays discounted games on a sleek, self-hosted web page or using an executable without any installation.
+Automatically monitors your Steam wishlist and displays discounted games on a sleek, self-hosted web page.
 
-![Steam Wishlist Sales](screenshots/result.png)
-![Steam Wishlist Sales](screenshots/result-classic.png)
+![Steam Wishlist Sales](screenshots/preview.png)
 
 ## Features
 
@@ -39,7 +38,7 @@ Automatically monitors your Steam wishlist and displays discounted games on a sl
 - **Windows 10/11** with **PowerShell 5.1+**
 - No other dependencies
 
-## Quick Install (Linux)
+## Quick Install (Linux as root user)
 
 ```bash
 git clone https://github.com/W1p3out/steam-wishlist-sales-checker
@@ -273,10 +272,6 @@ sudo chown www-data:www-data /var/www/steam-wishlist-sales/cache.json
 
 - Check sudo permissions: `sudo -u www-data sudo /opt/steam-wishlist-sales/steam-wishlist-sales.sh`
 - Check logs: `tail -f /var/log/apache2/steam-wishlist-sales-error.log`
-
-### After scan, showing apache2 "It Works!"
-
-Refresh you browser. It should load your Steam Wishlist Sales Checker website.
 
 ### PowerShell parsing error
 

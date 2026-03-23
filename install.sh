@@ -191,6 +191,8 @@ log "Configuration d'Apache..."
 VHOST_FILE="/etc/apache2/sites-available/steam-wishlist-sales.conf"
 
 cat > "$VHOST_FILE" << EOF
+Listen ${PORT}
+
 <VirtualHost *:${PORT}>
     DocumentRoot ${WEB_DIR}
     DirectoryIndex index.html
@@ -212,15 +214,6 @@ cat > "$VHOST_FILE" << EOF
     CustomLog \${APACHE_LOG_DIR}/steam-wishlist-sales-access.log combined
 </VirtualHost>
 EOF
-
-# Ajouter le Listen dans ports.conf (sans doublon)
-PORTS_CONF="/etc/apache2/ports.conf"
-if ! grep -q "^Listen ${PORT}$" "$PORTS_CONF" 2>/dev/null; then
-    echo "Listen ${PORT}" >> "$PORTS_CONF"
-    ok "Port ${PORT} ajouté à ports.conf"
-else
-    ok "Port ${PORT} déjà présent dans ports.conf"
-fi
 
 # Activer les modules nécessaires
 a2enmod headers > /dev/null 2>&1 || true

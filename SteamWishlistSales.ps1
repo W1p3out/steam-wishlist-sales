@@ -227,11 +227,20 @@ if ($MissingCount -gt 0) {
                 if ($AppData.data.genres) {
                     $AppGenres = ($AppData.data.genres | ForEach-Object { $_.description }) -join ','
                 }
+                $AppMC = if ($AppData.data.metacritic -and $AppData.data.metacritic.score) { [int]$AppData.data.metacritic.score } else { $null }
+                $AppDesc = if ($AppData.data.short_description) { $AppData.data.short_description } else { '' }
+                $AppCats = ''
+                if ($AppData.data.categories) {
+                    $AppCats = ($AppData.data.categories | ForEach-Object { $_.description }) -join ','
+                }
 
                 $Cache[$AppId] = @{
                     name   = $AppName
                     img    = $AppImg
                     genres = $AppGenres
+                    metacritic = $AppMC
+                    desc   = $AppDesc
+                    cats   = $AppCats
                 }
             }
         } catch {
@@ -265,6 +274,9 @@ foreach ($AppId in $AllPrices.Keys) {
         "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/$AppId/header.jpg"
     }
     $Genres = if ($CacheEntry -and $CacheEntry.genres) { $CacheEntry.genres } else { '' }
+    $MC = if ($CacheEntry -and $CacheEntry.metacritic) { $CacheEntry.metacritic } else { $null }
+    $Desc = if ($CacheEntry -and $CacheEntry.desc) { $CacheEntry.desc } else { '' }
+    $Cats = if ($CacheEntry -and $CacheEntry.cats) { $CacheEntry.cats } else { '' }
 
     $Games += [PSCustomObject]@{
         AppId       = $AppId
@@ -274,6 +286,9 @@ foreach ($AppId in $AllPrices.Keys) {
         SalePrice   = $PriceInfo.sale_price
         DiscountPct = $PriceInfo.discount_pct
         Genres      = $Genres
+        Metacritic  = $MC
+        Desc        = $Desc
+        Cats        = $Cats
     }
 }
 
@@ -338,6 +353,8 @@ Add-Type -AssemblyName System.Web
 $BestDiscount = ($Games | Measure-Object -Property DiscountPct -Maximum).Maximum
 $CheapestPrice = ($Games | Measure-Object -Property SalePrice -Minimum).Minimum
 $CheapestFmt = "{0:N2}" -f ($CheapestPrice / 100) -replace '\.', ','
+$MaxPrice = ($Games | Measure-Object -Property SalePrice -Maximum).Maximum
+$MaxPriceEur = [math]::Ceiling($MaxPrice / 100)
 $Now = Get-Date -Format 'dd/MM/yyyy HH:mm'
 $Elapsed = $Stopwatch.Elapsed
 
@@ -354,6 +371,21 @@ $GenreButtonsHtml = ''
 foreach ($Genre in $AllGenres) {
     $SafeGenre = [System.Web.HttpUtility]::HtmlEncode($Genre.Trim())
     $GenreButtonsHtml += "<button class=`"genre-btn`" data-genre=`"$SafeGenre`">$SafeGenre</button>"
+}
+
+# Extract unique categories for filter buttons (gameplay-relevant only)
+$AllCats = @()
+foreach ($Game in $Games) {
+    if ($Game.Cats -and $Game.Cats.Length -gt 0) {
+        $AllCats += $Game.Cats -split ','
+    }
+}
+$AllCats = $AllCats | Where-Object { $_ -and $_.Trim() -match '(?i)single.player|multi.player|co.op|pvp|mmo|cross.platform|shared.split|lan' } | ForEach-Object { $_.Trim() } | Sort-Object -Unique
+
+$CatButtonsHtml = ''
+foreach ($Cat in $AllCats) {
+    $SafeCat = [System.Web.HttpUtility]::HtmlEncode($Cat)
+    $CatButtonsHtml += "<button class=`"cat-btn`" data-cat=`"$SafeCat`">$SafeCat</button>"
 }
 
 # Generate card HTML
@@ -387,10 +419,20 @@ foreach ($Game in $Games) {
 
     $BadgeClass = if ($Game.DiscountPct -ge 70) { 'badge-high' } elseif ($Game.DiscountPct -ge 30) { 'badge-mid' } else { 'badge-low' }
 
+    $McHtml = ''
+    if ($Game.Metacritic) {
+        $McClass = if ($Game.Metacritic -ge 75) { 'mc-high' } elseif ($Game.Metacritic -ge 50) { 'mc-mid' } else { 'mc-low' }
+        $McHtml = "<span class=`"metacritic $McClass`">$($Game.Metacritic)</span>"
+    }
+
+    $SafeDesc = [System.Web.HttpUtility]::HtmlAttributeEncode(($Game.Desc -replace '<[^>]*>', ''))
+    $CatsData = if ($Game.Cats) { $Game.Cats } else { '' }
+    $McVal = if ($Game.Metacritic) { $Game.Metacritic } else { 0 }
+
     $CardsHtml += @"
-<a class="card" data-name="$SafeNameAttr" data-sale="$($Game.SalePrice)" data-disc="$($Game.DiscountPct)" data-genres="$GenresData" data-badge="$($Game.Badge)" href="https://store.steampowered.com/app/$($Game.AppId)" target="_blank" rel="noopener">
+<a class="card" data-name="$SafeNameAttr" data-sale="$($Game.SalePrice)" data-disc="$($Game.DiscountPct)" data-genres="$GenresData" data-cats="$CatsData" data-badge="$($Game.Badge)" data-mc="$McVal" title="$SafeDesc" href="https://store.steampowered.com/app/$($Game.AppId)" target="_blank" rel="noopener">
 <div class="img-wrap"><img src="$($Game.Image)" alt="$SafeNameAttr" loading="lazy" /><span class="badge $BadgeClass">-$($Game.DiscountPct)%</span>$StatusBadgeHtml</div>
-<div class="info"><div class="name">$SafeName</div><div class="genres-row">$GenreTagsHtml</div><div class="prices"><span class="old">$NormalFmt$CurrSymbol</span><span class="new">$SaleFmt$CurrSymbol</span></div></div></a>
+<div class="info"><div class="name">$SafeName</div><div class="genres-row">$GenreTagsHtml</div><div class="prices"><span class="old">$NormalFmt$CurrSymbol</span><span class="new">$SaleFmt$CurrSymbol</span>$McHtml</div></div></a>
 "@
 }
 
@@ -456,6 +498,23 @@ $Html = @"
     .prices { display: flex; align-items: center; gap: 10px; margin-top: auto; }
     .old { font-size: 0.8rem; color: #6a7a88; text-decoration: line-through; }
     .new { font-family: 'Exo 2', sans-serif; font-size: 1.08rem; font-weight: 800; color: #a4d007; text-shadow: 0 0 10px rgba(164,208,7,0.15); }
+
+    .metacritic { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 22px; font-family: 'Exo 2', sans-serif; font-weight: 800; font-size: 0.68rem; border-radius: 4px; color: #fff; margin-left: auto; padding: 0 5px; }
+    .mc-high { background: #66cc33; }
+    .mc-mid { background: #ffcc33; color: #111; }
+    .mc-low { background: #ff4444; }
+
+    .price-filter { display: flex; align-items: center; gap: 8px; margin-left: 8px; padding-left: 8px; border-left: 1px solid rgba(102,192,244,0.12); }
+    .price-filter label { font-size: 0.75rem; color: #8f98a0; font-family: 'Outfit', sans-serif; white-space: nowrap; }
+    .price-filter input[type=range] { -webkit-appearance: none; appearance: none; width: 100px; height: 4px; background: rgba(102, 192, 244, 0.15); border-radius: 2px; outline: none; }
+    .price-filter input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #66c0f4; cursor: pointer; border: 2px solid #0a0e14; }
+    .price-filter input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #66c0f4; cursor: pointer; border: 2px solid #0a0e14; }
+    .price-val { font-size: 0.78rem; color: #66c0f4; font-weight: 600; font-family: 'Exo 2', sans-serif; min-width: 40px; }
+
+    .cat-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+    .cat-btn { background: rgba(164, 208, 7, 0.06); border: 1px solid rgba(164, 208, 7, 0.14); color: #8f98a0; padding: 5px 14px; border-radius: 18px; font-size: 0.72rem; cursor: pointer; transition: all 0.2s; font-family: 'Outfit', sans-serif; }
+    .cat-btn:hover { background: rgba(164, 208, 7, 0.14); color: #fff; }
+    .cat-btn.active { background: linear-gradient(135deg, #a4d007, #7aa800); color: #fff; border-color: transparent; font-weight: 600; }
     @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
     @media (max-width: 640px) { .container { padding: 14px 10px; } .header h1 { font-size: 1.3rem; } .grid { grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 8px; } .info { padding: 8px 10px 10px; } .name { font-size: 0.82rem; } .badge { font-size: 0.8rem; padding: 3px 9px 3px 11px; } .status-badge { font-size: 0.62rem; padding: 3px 7px 3px 5px; } .stats { gap: 12px; font-size: 0.75rem; } }
 
@@ -502,6 +561,20 @@ $Html = @"
     body.classic .genre-tag { font-size: 0.58rem; color: #8a9a80; background: rgba(0,0,0,0.2); border-radius: 2px; padding: 1px 5px; }
     body.classic .old { font-size: 0.72rem; color: #8a9a80; }
     body.classic .new { font-family: Tahoma, sans-serif; font-size: 0.88rem; font-weight: bold; color: #a4d007; text-shadow: none; }
+
+    body.classic .metacritic { border-radius: 2px; font-family: Tahoma, sans-serif; font-size: 0.62rem; }
+
+    body.classic .price-filter { border-left-color: rgba(138,154,128,0.2); }
+    body.classic .price-filter label { font-family: Tahoma, sans-serif; font-size: 0.68rem; color: #8a9a80; }
+    body.classic .price-filter input[type=range] { background: rgba(138,154,128,0.2); }
+    body.classic .price-filter input[type=range]::-webkit-slider-thumb { background: #7a9a64; border-color: #1e2a16; }
+    body.classic .price-filter input[type=range]::-moz-range-thumb { background: #7a9a64; border-color: #1e2a16; }
+    body.classic .price-val { color: #a4d007; font-family: Tahoma, sans-serif; }
+
+    body.classic .cat-filters { gap: 4px; margin-bottom: 10px; }
+    body.classic .cat-btn { background: linear-gradient(180deg, #3a4a30 0%, #2a3a20 100%); border: 1px solid #4a5a40; color: #8a9a80; border-radius: 3px; font-family: Tahoma, sans-serif; font-size: 0.68rem; padding: 3px 10px; }
+    body.classic .cat-btn:hover { color: #d2e8b0; }
+    body.classic .cat-btn.active { background: linear-gradient(180deg, #7a9a64 0%, #5a7a47 100%); color: #fff; border-color: #8aaa74; }
 </style>
 </head>
 <body data-cache-path="$CachePath">
@@ -525,15 +598,26 @@ $Html = @"
     <div class="search-box"><input type="text" id="search" placeholder="Rechercher un jeu..." /></div>
     <div class="toolbar">
         <button class="active" data-sort="alpha">A&#8594;Z</button>
+        <button data-sort="alpha_desc">Z&#8594;A</button>
         <button data-sort="price_asc">Prix &#8593;</button>
         <button data-sort="price_desc">Prix &#8595;</button>
         <button data-sort="discount">% Promo</button>
+        <button data-sort="metacritic">Metacritic</button>
+        <div class="price-filter">
+            <label>En dessous de</label>
+            <input type="range" id="priceMax" min="0" max="$MaxPriceEur" value="$MaxPriceEur" step="1">
+            <span class="price-val" id="priceLabel">$MaxPriceEur&#8364;</span>
+        </div>
     </div>
 </div>
 <div class="genre-filters" id="genreFilters">
     <button class="genre-btn active" data-genre="all">Tous</button>
     <button class="genre-btn new-only-btn" id="newOnlyBtn" onclick="toggleNewOnly()">&#127381; Nouveaut&#233;s</button>
     $GenreButtonsHtml
+</div>
+<div class="cat-filters" id="catFilters">
+    <button class="cat-btn active" data-cat="all">Tous</button>
+    $CatButtonsHtml
 </div>
 <div class="grid" id="grid">
 $CardsHtml
@@ -550,38 +634,56 @@ document.querySelectorAll('.toolbar button').forEach(btn => {
         cards.sort((a,b) => {
             switch(mode) {
                 case 'alpha': return a.dataset.name.localeCompare(b.dataset.name, 'fr', {sensitivity:'base'});
+                case 'alpha_desc': return b.dataset.name.localeCompare(a.dataset.name, 'fr', {sensitivity:'base'});
                 case 'price_asc': return Number(a.dataset.sale) - Number(b.dataset.sale);
                 case 'price_desc': return Number(b.dataset.sale) - Number(a.dataset.sale);
                 case 'discount': return Number(b.dataset.disc) - Number(a.dataset.disc);
+                case 'metacritic': return Number(b.dataset.mc || 0) - Number(a.dataset.mc || 0);
             }
         });
         cards.forEach((c,i) => { c.style.animation='none'; c.offsetHeight; c.style.animation=''; c.style.animationDelay=Math.min(i*20,500)+'ms'; grid.appendChild(c); });
     });
 });
 let activeGenre = 'all';
+let activeCat = 'all';
 let showNewOnly = false;
 function applyFilters() {
     const q = document.getElementById('search').value.toLowerCase();
+    const pMax = parseInt(document.getElementById('priceMax').value) * 100;
+    document.getElementById('priceLabel').textContent = document.getElementById('priceMax').value + '\u20ac';
     let visible = 0;
     document.querySelectorAll('.card').forEach(c => {
         const name = c.querySelector('.name').textContent.toLowerCase();
         const genres = (c.dataset.genres || '').toLowerCase();
+        const cats = (c.dataset.cats || '').toLowerCase();
         const badge = c.dataset.badge || '';
+        const price = parseInt(c.dataset.sale) || 0;
         const matchSearch = name.includes(q);
         const matchGenre = activeGenre === 'all' || genres.split(',').some(g => g.trim().toLowerCase() === activeGenre.toLowerCase());
+        const matchCat = activeCat === 'all' || cats.split(',').some(ct => ct.trim().toLowerCase() === activeCat.toLowerCase());
         const matchNew = !showNewOnly || badge === 'new';
-        const show = matchSearch && matchGenre && matchNew;
+        const matchPrice = price <= pMax;
+        const show = matchSearch && matchGenre && matchCat && matchNew && matchPrice;
         c.style.display = show ? '' : 'none';
         if (show) visible++;
     });
     document.getElementById('count').textContent = visible + ' jeu' + (visible > 1 ? 'x' : '') + ' en promo';
 }
+document.getElementById('priceMax').addEventListener('input', applyFilters);
 document.getElementById('search').addEventListener('input', applyFilters);
 document.querySelectorAll('.genre-btn:not(.new-only-btn)').forEach(btn => {
     btn.addEventListener('click', () => {
         document.querySelectorAll('.genre-btn:not(.new-only-btn)').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         activeGenre = btn.dataset.genre;
+        applyFilters();
+    });
+});
+document.querySelectorAll('.cat-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeCat = btn.dataset.cat;
         applyFilters();
     });
 });

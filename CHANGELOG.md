@@ -1,0 +1,193 @@
+# CHANGELOG
+
+---
+
+## v1.3 — 04/03/2026
+
+### 🇫🇷 Français
+
+#### ✨ Nouvelles fonctionnalités
+
+**Slider de fourchette de prix**
+Un curseur "En dessous de X€" intégré dans la barre de tri permet de filtrer les jeux par prix maximal de vente. Le filtre se combine avec la recherche textuelle, les filtres par genre, par catégorie et le filtre Nouveautés. Stylisé dans les deux thèmes (Modern et Classic Steam).
+
+**Tri Z→A et Metacritic**
+Deux nouveaux boutons de tri : Z→A (ordre alphabétique inversé) et Metacritic (du score le plus élevé au plus bas). S'ajoutent aux tris existants A→Z, Prix ↑, Prix ↓ et % Promo.
+
+**Filtres par catégorie (Solo, Co-op, Multi...)**
+Les catégories de jeu (Single-player, Multi-player, Co-op, PvP, MMO, etc.) sont récupérées depuis l'API `appdetails` et stockées dans le cache. Une barre de filtres dédiée permet de n'afficher que les jeux correspondant à un mode de jeu. Se combine avec tous les autres filtres.
+
+**Score Metacritic**
+Le score Metacritic est récupéré depuis l'API `appdetails` et stocké dans le cache. Quand disponible, un petit badge coloré s'affiche à côté du prix : vert (≥75), jaune (≥50), rouge (<50). Les jeux sans score Metacritic n'affichent rien.
+
+**Description courte au survol**
+La description courte de chaque jeu (champ `short_description` de l'API) est ajoutée en attribut `title` sur chaque carte. Un simple survol de la vignette affiche la description dans le tooltip natif du navigateur.
+
+#### 🔧 Modifications techniques
+
+- **Bash** : extraction de `.data.metacritic.score` et `.data.short_description` dans le jq d'appdetails, enrichissement du JSON avec les champs `metacritic` et `desc`, génération du badge Metacritic conditionnel et de l'attribut `title` dans le template jq des cartes, calcul de `MAX_PRICE_EUR` pour le slider, HTML du slider dans la section HTMLMETA interpolée, CSS `.metacritic` / `.mc-high` / `.mc-mid` / `.mc-low` et `.price-slider-wrap` pour les deux thèmes, listeners JS `priceMin` / `priceMax` avec contrainte croisée, filtre `matchPrice` dans `applyFilters()`.
+- **PowerShell** : extraction de `metacritic.score` et `short_description` dans la boucle appdetails, propriétés `Metacritic` et `Desc` sur l'objet Game, génération de `$McHtml` conditionnel et `$SafeDesc` pour l'attribut `title`, calcul de `$MaxPriceEur`, HTML du slider, CSS et JS identiques au Bash.
+
+#### 📊 Métriques
+
+| Fichier | v1.2 | v1.3 | Delta |
+|---|---|---|---|
+| `steam-wishlist-sales.sh` | 865 lignes | 958 lignes | +93 |
+| `SteamWishlistSales.ps1` | 639 lignes | 741 lignes | +102 |
+
+---
+
+### 🇬🇧 English
+
+#### ✨ New features
+
+**Price range slider**
+A "Below X€" slider integrated into the sort toolbar lets you filter games by maximum sale price. The filter combines with text search, genre filters, category filters, and the New filter. Styled in both themes (Modern and Classic Steam).
+
+**Z→A and Metacritic sorting**
+Two new sort buttons: Z→A (reverse alphabetical) and Metacritic (highest score first). Added alongside existing A→Z, Price ↑, Price ↓, and Discount % sorts.
+
+**Category filters (Solo, Co-op, Multi...)**
+Game categories (Single-player, Multi-player, Co-op, PvP, MMO, etc.) are fetched from the `appdetails` API and stored in the cache. A dedicated filter bar lets you display only games matching a specific play mode. Combines with all other filters.
+
+**Metacritic score**
+The Metacritic score is fetched from the `appdetails` API and stored in the cache. When available, a small color-coded badge appears next to the price: green (≥75), yellow (≥50), red (<50). Games without a Metacritic score show nothing.
+
+**Short description on hover**
+Each game's short description (from the `short_description` API field) is added as a `title` attribute on each card. Simply hovering over the thumbnail displays the description in the browser's native tooltip.
+
+#### 🔧 Technical changes
+
+- **Bash**: extraction of `.data.metacritic.score` and `.data.short_description` in the appdetails jq, JSON enrichment with `metacritic` and `desc` fields, conditional Metacritic badge and `title` attribute in the card jq template, `MAX_PRICE_EUR` computation for the slider, slider HTML in the interpolated HTMLMETA section, `.metacritic` / `.mc-high` / `.mc-mid` / `.mc-low` and `.price-slider-wrap` CSS for both themes, `priceMin` / `priceMax` JS listeners with cross-constraint, `matchPrice` filter in `applyFilters()`.
+- **PowerShell**: extraction of `metacritic.score` and `short_description` in the appdetails loop, `Metacritic` and `Desc` properties on the Game object, conditional `$McHtml` and `$SafeDesc` for the `title` attribute, `$MaxPriceEur` computation, slider HTML, CSS and JS identical to Bash.
+
+#### 📊 Metrics
+
+| File | v1.2 | v1.3 | Delta |
+|---|---|---|---|
+| `steam-wishlist-sales.sh` | 865 lines | 958 lines | +93 |
+| `SteamWishlistSales.ps1` | 639 lines | 741 lines | +102 |
+
+---
+
+## v1.2 — 03/03/2026
+
+### 🇫🇷 Français
+
+#### ✨ Nouvelles fonctionnalités
+
+**Badges de suivi (New / Prix 🔼 / Prix 🔽)**
+Le script sauvegarde désormais les prix de vente de chaque scan dans un fichier `previous_sales.json` (Linux) ou `previous_sales_<ID>.json` (Windows, dans `%APPDATA%`). Au scan suivant, une comparaison automatique s'effectue : un badge bleu **NEW** apparaît sur les jeux qui n'étaient pas en promo au scan précédent, un badge rouge **Prix 🔼** signale une hausse de prix depuis le dernier scan, et un badge vert **Prix 🔽** indique une baisse. Ces badges s'affichent en haut à gauche de l'image de chaque carte (le badge de remise reste en haut à droite). Au premier scan, aucun badge n'est affiché puisqu'il n'y a pas encore de données de référence.
+
+**Badge de remise coloré selon le niveau de promotion**
+Le badge `-XX%` en haut à droite change de couleur selon l'intensité de la remise : vert pour les grosses promos (70-100%), orange pour les promos moyennes (30-69%), rouge pour les petites promos (0-29%). Permet de repérer d'un coup d'œil les meilleures affaires. Stylisé dans les deux thèmes (Modern et Classic Steam).
+
+**Bouton « Vider le cache »**
+Un bouton rouge discret 🗑️ dans le header permet de supprimer le cache et les données de comparaison. Un message de confirmation `confirm()` avertit l'utilisateur que le prochain scan sera plus long. Sur Linux/PHP, le bouton appelle `run.php?clear-cache=1` via `fetch()` avec retour visuel (✅ Cache vidé !) sans quitter la page ni relancer de scan. Sur PowerShell, le bouton affiche les instructions pour relancer avec `-ClearCache` et le chemin du fichier cache.
+
+**Filtre « Nouveautés »**
+Un bouton 🆕 dans la barre de filtres permet d'afficher uniquement les jeux nouvellement en promotion (badge NEW). Ce filtre se combine avec la recherche textuelle et les filtres par genre : on peut par exemple chercher les nouveaux RPG en promo.
+
+#### 🔧 Modifications techniques
+
+- **Bash** : nouvelle variable `PREVIOUS_SALES_FILE`, étape 5 de comparaison avec `jq --slurpfile`, classes CSS conditionnelles `badge-high`/`badge-mid`/`badge-low` dans le template jq, attribut `data-badge` sur chaque carte, CSS status-badge / clear-cache-btn / new-only-btn pour les deux thèmes, fonction `clearCache()` via `fetch()` avec feedback visuel, fonction `toggleNewOnly()`, `applyFilters()` enrichi avec filtre `showNewOnly`, sélecteur `:not(.new-only-btn)` pour isoler le bouton Nouveautés des filtres genre.
+- **PowerShell** : variable `$BadgeClass` conditionnelle, même logique de badges et filtres, bouton vider le cache avec `alert()` affichant le chemin et la commande `-ClearCache`, `data-cache-path` sur le body.
+- **run.php** : le paramètre `clear-cache=1` supprime les fichiers et retourne un simple texte de confirmation sans lancer de scan.
+
+#### 📊 Métriques
+
+| Fichier | v1.1 | v1.2 | Delta |
+|---|---|---|---|
+| `steam-wishlist-sales.sh` | 751 lignes | 860 lignes | +109 |
+| `SteamWishlistSales.ps1` | 544 lignes | 639 lignes | +95 |
+
+---
+
+### 🇬🇧 English
+
+#### ✨ New features
+
+**Tracking badges (New / Price 🔼 / Price 🔽)**
+The script now saves sale prices from each scan into a `previous_sales.json` file (Linux) or `previous_sales_<ID>.json` (Windows, in `%APPDATA%`). On the next scan, an automatic comparison takes place: a blue **NEW** badge appears on games that were not on sale in the previous scan, a red **Price 🔼** badge signals a price increase since the last scan, and a green **Price 🔽** badge indicates a price drop. These badges are displayed in the top-left corner of each card image (the discount badge remains top-right). On the first scan, no badges are shown since there is no reference data yet.
+
+**Color-coded discount badge**
+The `-XX%` badge in the top-right corner now changes color based on the discount level: green for major discounts (70-100%), orange for moderate discounts (30-69%), red for small discounts (0-29%). Makes it easy to spot the best deals at a glance. Styled in both themes (Modern and Classic Steam).
+
+**"Clear cache" button**
+A discreet red 🗑️ button in the page header lets you wipe the cache and comparison data. A `confirm()` dialog warns the user that the next scan will take longer. On Linux/PHP, the button calls `run.php?clear-cache=1` via `fetch()` with visual feedback (✅ Cache cleared!) without leaving the page or triggering a new scan. On PowerShell, the button displays instructions to rerun with `-ClearCache` and the cache file path.
+
+**"New releases" filter**
+A 🆕 button in the filter bar lets you display only newly discounted games (NEW badge). This filter combines with text search and genre filters — for example, you can search for new RPGs on sale.
+
+#### 🔧 Technical changes
+
+- **Bash**: new `PREVIOUS_SALES_FILE` variable, step 5 comparison using `jq --slurpfile`, conditional CSS classes `badge-high`/`badge-mid`/`badge-low` in jq template, `data-badge` attribute on each card, status-badge / clear-cache-btn / new-only-btn CSS for both themes, `clearCache()` function via `fetch()` with visual feedback, `toggleNewOnly()` function, enhanced `applyFilters()` with `showNewOnly` filter, `:not(.new-only-btn)` selector to isolate the New filter from genre buttons.
+- **PowerShell**: conditional `$BadgeClass` variable, same badge and filter logic, clear cache button with `alert()` showing the path and `-ClearCache` command, `data-cache-path` on body.
+- **run.php**: `clear-cache=1` parameter now deletes files and returns a plain text confirmation without triggering a scan.
+
+#### 📊 Metrics
+
+| File | v1.1 | v1.2 | Delta |
+|---|---|---|---|
+| `steam-wishlist-sales.sh` | 751 lines | 860 lines | +109 |
+| `SteamWishlistSales.ps1` | 544 lines | 639 lines | +95 |
+
+---
+
+## v1.1 — 28/02/2026
+
+### 🇫🇷 Français
+
+#### ✨ Nouvelles fonctionnalités
+
+**Cache intelligent**
+Le script conserve désormais un fichier de cache persistant (`cache.json` sur Linux, `%APPDATA%\SteamWishlistSales\cache_<ID>.json` sur Windows) qui stocke les noms, images et genres de chaque jeu déjà récupéré. Lors des scans suivants, seuls les nouveaux jeux en promo déclenchent un appel à l'API Steam — les autres sont lus directement depuis le cache. En pratique, un premier scan de ~165 jeux prend environ 5 minutes ; les suivants passent sous la minute si la plupart des jeux sont déjà connus. Le log affiche clairement la répartition entre jeux en cache et jeux à récupérer. Sur Windows, le paramètre `-ClearCache` permet de forcer un rafraîchissement complet.
+
+**Filtres par genres Steam**
+L'appel à l'API `appdetails` extrait désormais les genres de chaque jeu (Action, RPG, Indie, Aventure, Stratégie…). Ces genres sont affichés sous forme de petits tags sur chaque carte, et une barre de filtres cliquables apparaît au-dessus de la grille. Un clic sur un genre filtre instantanément l'affichage. Le filtre par genre se combine avec la recherche textuelle existante : on peut par exemple chercher "dark" parmi les RPG uniquement. Les genres sont également sauvegardés dans le cache.
+
+**Thème Classic Steam**
+Un bouton dans le header permet de basculer entre le thème moderne actuel et un thème rétro inspiré de l'interface Steam 2004-2010 : fond vert olive, police Tahoma, boutons avec dégradés biseautés façon Windows XP, cartes sans coins arrondis ni animations, badge de promo en vert plat. Le choix de thème est sauvegardé dans un cookie (1 an de durée) et restauré automatiquement à chaque visite.
+
+#### 🔧 Modifications techniques
+
+- **Bash** : nouvelle variable `CACHE_FILE`, extraction des genres via jq dans l'étape 4, génération des boutons de genre et de l'attribut `data-genres` sur chaque carte, ajout du CSS complet du thème Classic en overrides `body.classic`, nouveau JavaScript pour les filtres combinés et le toggle de thème.
+- **PowerShell** : nouveau paramètre `-ClearCache`, stockage du cache dans `%APPDATA%`, gestion du cache via hashtable PowerShell et `ConvertTo-Json`/`ConvertFrom-Json`, extraction des genres depuis `$AppData.data.genres`, encodage UTF-8 avec BOM, remplacement de tous les caractères Unicode non-ASCII dans le code PS par des équivalents ASCII ou des entités HTML pour assurer la compatibilité Windows PowerShell 5.1.
+- **install.sh** : initialise `cache.json` avec les bonnes permissions lors de l'installation.
+- **HTML** : attribut `data-genres` sur chaque carte, section `.genres-row` avec tags `.genre-tag`, barre `.genre-filters`, fonction JavaScript `applyFilters()` combinant recherche + genre, fonction `toggleTheme()` avec persistance cookie.
+
+#### 📊 Métriques
+
+| Fichier | v1.0 | v1.1 | Delta |
+|---|---|---|---|
+| `steam-wishlist-sales.sh` | 686 lignes | 751 lignes | +65 |
+| `SteamWishlistSales.ps1` | 352 lignes | 544 lignes | +192 |
+
+---
+
+### 🇬🇧 English
+
+#### ✨ New features
+
+**Smart cache**
+The script now maintains a persistent cache file (`cache.json` on Linux, `%APPDATA%\SteamWishlistSales\cache_<ID>.json` on Windows) storing the name, image, and genres of every previously fetched game. On subsequent scans, only new games on sale trigger an API call — everything else is read straight from cache. In practice, a first scan of ~165 games takes about 5 minutes; subsequent runs drop under one minute when most games are already known. The log clearly shows the breakdown between cached and new games. On Windows, the `-ClearCache` parameter forces a full refresh.
+
+**Steam genre filters**
+The `appdetails` API call now extracts each game's genres (Action, RPG, Indie, Adventure, Strategy…). These are displayed as small tags on each card, and a clickable filter bar appears above the grid. Clicking a genre instantly filters the view. The genre filter combines with the existing text search — for example, you can search "dark" among RPGs only. Genres are also saved in the cache.
+
+**Classic Steam theme**
+A button in the header toggles between the current modern theme and a retro theme inspired by the 2004-2010 Steam UI: olive-green background, Tahoma font, beveled gradient buttons reminiscent of Windows XP, cards with no rounded corners or animations, and flat green discount badges. The theme preference is stored in a cookie (1-year expiry) and automatically restored on each visit.
+
+#### 🔧 Technical changes
+
+- **Bash**: new `CACHE_FILE` variable, genre extraction via jq in step 4, genre button generation and `data-genres` attribute on each card, full Classic theme CSS as `body.classic` overrides, new JavaScript for combined filters and theme toggling.
+- **PowerShell**: new `-ClearCache` parameter, cache stored in `%APPDATA%`, cache management via PowerShell hashtable with `ConvertTo-Json`/`ConvertFrom-Json`, genre extraction from `$AppData.data.genres`, UTF-8 BOM encoding, all non-ASCII Unicode characters in PS code replaced with ASCII equivalents or HTML entities for Windows PowerShell 5.1 compatibility.
+- **install.sh**: initializes `cache.json` with proper permissions during installation.
+- **HTML**: `data-genres` attribute on each card, `.genres-row` section with `.genre-tag` elements, `.genre-filters` bar, `applyFilters()` JavaScript function combining search and genre, `toggleTheme()` function with cookie persistence.
+
+#### 📊 Metrics
+
+| File | v1.0 | v1.1 | Delta |
+|---|---|---|---|
+| `steam-wishlist-sales.sh` | 686 lines | 751 lines | +65 |
+| `SteamWishlistSales.ps1` | 352 lines | 544 lines | +192 |
