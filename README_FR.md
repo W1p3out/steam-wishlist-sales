@@ -5,6 +5,7 @@ Code généré avec Claude (Anthropic). Ceci est un projet d'apprentissage pour 
 Surveille automatiquement votre wishlist Steam et affiche les jeux en promotion sur une page web élégante, auto-hébergée.
 
 ![Steam Wishlist Sales](screenshots/preview.png)
+![Steam Wishlist Sales](screenshots/preview2.png)
 
 ## Fonctionnalités
 
