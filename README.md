@@ -5,6 +5,7 @@ Code written with Claude (Anthropic). This is a learning project to see how "cur
 Automatically monitors your Steam wishlist and displays discounted games on a sleek, self-hosted web page.
 
 ![Steam Wishlist Sales](screenshots/preview.png)
+![Steam Wishlist Sales](screenshots/preview2.png)
 
 ## Features
 
