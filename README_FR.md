@@ -1,4 +1,4 @@
-# 🎮 Steam Wishlist Sales (v1.2)
+# 🎮 Steam Wishlist Sales (v1.4)
 
 Code généré avec Claude (Anthropic). Ceci est un projet d'apprentissage pour comprendre comment les commandes "curl" et "Invoke-RestMethod" peuvent récupérer des informations via l'API Steam. Un exécutable est également disponible pour Windows pour simplement vérifier les promotions de votre liste de souhaits Steam sans aucune installation, dans la page "Releases".
 
@@ -11,6 +11,7 @@ Surveille automatiquement votre wishlist Steam et affiche les jeux en promotion 
 - **Scan automatique** de la wishlist via l'API Steam (toutes les 6h par défaut)
 - **Badges de suivi** : badge bleu **NEW** pour les nouveaux jeux en promo, badge rouge **Prix 🔼** si le prix a augmenté, badge vert **Prix 🔽** si le prix a baissé depuis le dernier scan
 - **Filtrer par nouveautés** : affiche uniquement les nouveaux jeux en promotion
+- **Date de fin de la promotion** : affiche la date de fin de la promotion (dans la barre de recherche, entrer 'swsc:endofsales-on' pour activer, 'off' pour désactiver)
 - **Cache intelligent** : seuls les nouveaux jeux en promo déclenchent des appels API, les autres sont lus depuis le cache local (scans 5x plus rapides)
 - **Bouton vider le cache** (Linux/PHP) : un clic pour tout réinitialiser, avec confirmation
 - **Filtres par genre** : Action, RPG, Indie... combinables avec la recherche textuelle

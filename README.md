@@ -1,16 +1,18 @@
-# 🎮 Steam Wishlist Sales (v1.2)
+# 🎮 Steam Wishlist Sales (v1.4)
 
 Code written with Claude (Anthropic). This is a learning project to see how "curl" and "Invoke-RestMethod" commands could grab informations from Steam API. An executable is also available for Windows if you want to simply scan your wishlist sales without any installation in releases page.
 
 Automatically monitors your Steam wishlist and displays discounted games on a sleek, self-hosted web page.
 
 ![Steam Wishlist Sales](screenshots/preview.png)
+![Steam Wishlist Sales](screenshots/preview2.png)
 
 ## Features
 
 - **Automatic scanning** of your wishlist via the Steam API (every 6 hours by default)
 - **Tracking badges**: blue **NEW** badge for newly discounted games, red **Price 🔼** if price went up, green **Price 🔽** if price dropped since last scan
 - **Filter new only** : show only new discounted games
+- **End of sales remaining time** : check when the game is not on sale anymore (on search bar, add 'swsc:endofsales-on' to activate, 'off to deactivate)
 - **Smart cache**: only new sale entries trigger API calls; everything else is read from local cache (5x faster scans)
 - **Clear cache button** (Linux/PHP): one click to reset everything, with confirmation dialog
 - **Genre filters**: Action, RPG, Indie... combinable with text search
