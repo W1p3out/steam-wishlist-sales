@@ -78,6 +78,7 @@ The script generates an HTML file in `%TEMP%` and opens it in your default brows
 | **Country** | Country code for pricing | `fr` |
 | **OutputPath** | Path for generated HTML | `%TEMP%\steam-wishlist-sales.html` |
 | **ClearCache** | Clear cache before scanning | disabled |
+| **ScrapeEndDates** | Add game end of sale time | disabled |
 
 ## Manual Install (Linux)
 
