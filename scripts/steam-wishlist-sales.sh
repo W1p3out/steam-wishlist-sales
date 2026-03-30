@@ -26,6 +26,8 @@ OUTPUT_DIR="/var/www/steam-wishlist-sales"
 OUTPUT_FILE="${OUTPUT_DIR}/index.html"
 CACHE_FILE="${OUTPUT_DIR}/cache.json"
 PREVIOUS_SALES_FILE="${OUTPUT_DIR}/previous_sales.json"
+ENDOFSALES_FLAG="${OUTPUT_DIR}/endofsales.flag"
+SALE_DATES_FILE="${OUTPUT_DIR}/sale_dates.json"
 TEMP_DIR="/tmp/steam-wishlist-$$"
 LOCK_FILE="/tmp/steam-wishlist-sales.lock"
 BATCH_SIZE=30
@@ -336,7 +338,72 @@ chmod 644 "$PREVIOUS_SALES_FILE"
 chown www-data:www-data "$PREVIOUS_SALES_FILE" 2>/dev/null
 
 # ═══════════════════════════════════════════════════════════════
-# ÉTAPE 6 : Générer la page HTML finale
+# ÉTAPE 6 : Scraper les dates de fin de promo (si activé)
+# ═══════════════════════════════════════════════════════════════
+if [ -f "$ENDOFSALES_FLAG" ] && [ "$SALE_COUNT" -gt 0 ]; then
+    log "Récupération des dates de fin de promotion..."
+    DATES_TMP=$(mktemp)
+    echo "{" > "$DATES_TMP"
+
+    APPIDS=$(jq -r '.[].appid' "$SALES_FILE")
+    TOTAL=$(echo "$APPIDS" | wc -w)
+    COUNT=0
+    FOUND=0
+    FIRST=true
+
+    for APPID in $APPIDS; do
+        COUNT=$((COUNT + 1))
+        printf "\r  [%d/%d] App %s..." "$COUNT" "$TOTAL" "$APPID" >&2
+
+        PAGE=$(curl -sL --max-time 15 \
+            -H "Cookie: birthtime=0; wants_mature_content=1" \
+            "https://store.steampowered.com/app/${APPID}/" 2>/dev/null)
+
+        END_TS=$(echo "$PAGE" | grep -oP 'InitDailyDealTimer\s*\(\s*\$DiscountCountdown\s*,\s*\K\d{10}' | head -1)
+
+        # Pattern 2 : texte "prend fin le DD mois" (FR) ou "Offer ends DD month" (EN)
+        if [ -z "$END_TS" ]; then
+            DATE_TEXT=$(echo "$PAGE" | grep -oP '(prend fin le |Offer ends )\K[^<]+' | head -1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            if [ -n "$DATE_TEXT" ]; then
+                # Convertir les mois français en anglais pour date -d
+                EN_DATE=$(echo "$DATE_TEXT" | sed \
+                    -e 's/janvier/January/i' -e 's/février/February/i' -e 's/mars/March/i' \
+                    -e 's/avril/April/i' -e 's/mai/May/i' -e 's/juin/June/i' \
+                    -e 's/juillet/July/i' -e 's/août/August/i' -e 's/septembre/September/i' \
+                    -e 's/octobre/October/i' -e 's/novembre/November/i' -e 's/décembre/December/i')
+                # Ajouter l'année courante si absente
+                if ! echo "$EN_DATE" | grep -qP '\d{4}'; then
+                    EN_DATE="$EN_DATE $(date +%Y)"
+                fi
+                END_TS=$(date -d "$EN_DATE 18:00" +%s 2>/dev/null)
+            fi
+        fi
+
+        if [ -n "$END_TS" ] && [ "$END_TS" -gt 0 ] 2>/dev/null; then
+            if [ "$FIRST" = true ]; then FIRST=false; else echo "," >> "$DATES_TMP"; fi
+            echo "\"$APPID\": $END_TS" >> "$DATES_TMP"
+            FOUND=$((FOUND + 1))
+        fi
+
+        sleep 1
+    done
+
+    echo "" >> "$DATES_TMP"
+    echo "}" >> "$DATES_TMP"
+
+    mv "$DATES_TMP" "$SALE_DATES_FILE"
+    chmod 644 "$SALE_DATES_FILE"
+    chown www-data:www-data "$SALE_DATES_FILE" 2>/dev/null
+    echo ""
+    ok "Dates de fin récupérées : ${FOUND}/${TOTAL} jeux"
+else
+    if [ ! -f "$ENDOFSALES_FLAG" ]; then
+        rm -f "$SALE_DATES_FILE" 2>/dev/null
+    fi
+fi
+
+# ═══════════════════════════════════════════════════════════════
+# ÉTAPE 7 : Générer la page HTML finale
 # ═══════════════════════════════════════════════════════════════
 ELAPSED=$(( $(date +%s) - START_TIME ))
 BEST_DISCOUNT=$(jq '[.[].discount_pct] | if length > 0 then max else 0 end' "$SALES_FILE" 2>/dev/null || echo "0")
@@ -357,7 +424,7 @@ while IFS= read -r genre; do
 done <<< "$ALL_GENRES"
 
 # Extraire les catégories de jeu (filtrer les catégories pertinentes)
-ALL_CATS=$(jq -r '[.[].cats[]?] | unique | .[]' "$SALES_FILE" 2>/dev/null | grep -v '^$' | grep -iE "single.player|multi.player|co.op|pvp|mmo|cross.platform|shared.split|lan" | sort)
+ALL_CATS=$(jq -r '[.[].cats[]?] | unique | .[]' "$SALES_FILE" 2>/dev/null | grep -v '^$' | grep -iE "single.player|multi.player|co.op|pvp|mmo|cross.platform|shared.split|lan|un joueur|multijoueur|coop|coopératif|joueur contre joueur|JcJ|écran partagé" | sort)
 
 CAT_BUTTONS=""
 while IFS= read -r cat; do
@@ -435,11 +502,19 @@ cat > "$OUTPUT_FILE" << 'HTMLHEAD'
     .header-right { display: flex; align-items: center; gap: 14px; font-size: 0.82rem; color: #5a6a78; flex-wrap: wrap; }
     .header-right .count { color: #66c0f4; font-weight: 600; font-size: 0.95rem; }
 
-    .refresh-btn { display: inline-flex; align-items: center; gap: 6px; background: rgba(102, 192, 244, 0.08); border: 1px solid rgba(102, 192, 244, 0.2); color: #66c0f4; padding: 6px 16px; border-radius: 20px; font-size: 0.82rem; font-family: 'Outfit', sans-serif; cursor: pointer; transition: all 0.25s; text-decoration: none; }
-    .refresh-btn:hover { background: rgba(102, 192, 244, 0.18); color: #fff; border-color: #66c0f4; }
-
-    .theme-btn { display: inline-flex; align-items: center; gap: 5px; background: rgba(164, 208, 7, 0.08); border: 1px solid rgba(164, 208, 7, 0.2); color: #a4d007; padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; font-family: 'Outfit', sans-serif; cursor: pointer; transition: all 0.25s; }
-    .theme-btn:hover { background: rgba(164, 208, 7, 0.18); color: #fff; border-color: #a4d007; }
+    .gear-wrap { position: relative; display: inline-block; }
+    .gear-btn { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; background: rgba(102, 192, 244, 0.08); border: 1px solid rgba(102, 192, 244, 0.2); border-radius: 10px; color: #8f98a0; font-size: 1.1rem; cursor: pointer; transition: all 0.25s; }
+    .gear-btn:hover { border-color: #66c0f4; color: #fff; transform: rotate(45deg); }
+    .gear-dropdown { display: none; position: absolute; top: 42px; right: 0; background: #0c1018; border: 1px solid rgba(102, 192, 244, 0.2); border-radius: 10px; padding: 6px 0; min-width: 220px; box-shadow: 0 10px 35px rgba(0,0,0,0.5); z-index: 100; }
+    .gear-wrap.open .gear-dropdown { display: block; }
+    .gear-item { display: flex; align-items: center; gap: 10px; padding: 8px 16px; color: #8f98a0; font-size: 0.78rem; cursor: pointer; transition: all 0.15s; border: none; background: none; width: 100%; font-family: 'Outfit', sans-serif; text-decoration: none; text-align: left; }
+    .gear-item:hover { background: rgba(255,255,255,0.04); color: #fff; }
+    .gear-item .g-ico { width: 18px; text-align: center; }
+    .gear-item.active-theme { color: #66c0f4; font-weight: 600; }
+    .gear-item.active-theme::after { content: '\2713'; margin-left: auto; font-size: 0.7rem; }
+    .gear-sep { height: 1px; background: rgba(102, 192, 244, 0.08); margin: 4px 12px; }
+    .gear-danger { color: #e05a4f; }
+    .gear-danger:hover { background: rgba(224, 90, 79, 0.08); }
 
     .stats { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 18px; padding: 14px 18px; background: rgba(255,255,255,0.02); border: 1px solid rgba(102, 192, 244, 0.08); border-radius: 10px; font-size: 0.82rem; }
     .stats span { color: #8f98a0; }
@@ -462,6 +537,7 @@ cat > "$OUTPUT_FILE" << 'HTMLHEAD'
     .genre-btn:hover { background: rgba(164, 208, 7, 0.14); color: #a4d007; }
     .genre-btn.active { background: linear-gradient(135deg, #a4d007, #7aa800); color: #fff; border-color: transparent; font-weight: 600; }
     .new-only-btn.active { background: linear-gradient(135deg, #66c0f4, #4a9fd4); }
+    .expiring-btn.active { background: linear-gradient(135deg, #e05a4f, #c0392b); }
 
     .cat-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
     .cat-btn { background: rgba(164, 208, 7, 0.06); border: 1px solid rgba(164, 208, 7, 0.14); color: #8f98a0; padding: 5px 14px; border-radius: 18px; font-size: 0.72rem; cursor: pointer; transition: all 0.2s; font-family: 'Outfit', sans-serif; }
@@ -492,9 +568,6 @@ cat > "$OUTPUT_FILE" << 'HTMLHEAD'
     .up-badge { background: linear-gradient(135deg, #e05a4f, #c0392b); }
     .down-badge { background: linear-gradient(135deg, #27ae60, #1e8449); }
 
-    .clear-cache-btn { display: inline-flex; align-items: center; gap: 5px; background: rgba(224, 90, 79, 0.08); border: 1px solid rgba(224, 90, 79, 0.2); color: #e05a4f; padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; font-family: 'Outfit', sans-serif; cursor: pointer; transition: all 0.25s; }
-    .clear-cache-btn:hover { background: rgba(224, 90, 79, 0.18); color: #fff; border-color: #e05a4f; }
-
     .info { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 5px; flex: 1; }
     .name { font-size: 0.92rem; font-weight: 600; color: #fff; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .genres-row { display: flex; gap: 4px; flex-wrap: wrap; min-height: 18px; }
@@ -514,6 +587,9 @@ cat > "$OUTPUT_FILE" << 'HTMLHEAD'
     .price-filter input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #66c0f4; cursor: pointer; border: 2px solid #0a0e14; }
     .price-filter input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #66c0f4; cursor: pointer; border: 2px solid #0a0e14; }
     .price-val { font-size: 0.78rem; color: #66c0f4; font-weight: 600; font-family: 'Exo 2', sans-serif; min-width: 40px; }
+
+    .end-date { display: block; font-size: 0.68rem; color: #8f98a0; margin-top: 3px; font-family: 'Outfit', sans-serif; }
+    .end-date-urgent { color: #e05a4f; font-weight: 600; }
 
     .empty { text-align: center; padding: 80px 20px; color: #3e4f5e; font-size: 1.1rem; }
 
@@ -565,22 +641,15 @@ cat > "$OUTPUT_FILE" << 'HTMLHEAD'
     body.classic .header-right { font-size: 0.72rem; color: #a0b890; }
     body.classic .header-right .count { color: #d2e8b0; font-size: 0.78rem; }
 
-    body.classic .refresh-btn,
-    body.classic .theme-btn {
-        background: linear-gradient(180deg, #6b8a56 0%, #4a6637 100%);
-        border: 1px solid #7a9a64;
-        border-bottom: 1px solid #3a5228;
-        color: #d2e8b0;
-        border-radius: 3px;
-        padding: 3px 12px;
-        font-family: Tahoma, sans-serif;
-        font-size: 0.72rem;
-    }
-    body.classic .refresh-btn:hover,
-    body.classic .theme-btn:hover {
-        background: linear-gradient(180deg, #7a9a64 0%, #5a7a47 100%);
-        color: #fff;
-    }
+    body.classic .gear-btn { background: linear-gradient(180deg, #6b8a56 0%, #4a6637 100%); border: 1px solid #7a9a64; border-bottom: 1px solid #3a5228; border-radius: 3px; color: #d2e8b0; }
+    body.classic .gear-btn:hover { background: linear-gradient(180deg, #7a9a64 0%, #5a7a47 100%); color: #fff; transform: rotate(45deg); }
+    body.classic .gear-dropdown { background: #1a2612; border: 1px solid #4a5a40; border-radius: 3px; }
+    body.classic .gear-item { font-family: Tahoma, sans-serif; font-size: 0.72rem; color: #8a9a80; }
+    body.classic .gear-item:hover { background: rgba(255,255,255,0.04); color: #d2e8b0; }
+    body.classic .gear-item.active-theme { color: #a4d007; }
+    body.classic .gear-sep { background: rgba(138,154,128,0.15); }
+    body.classic .gear-danger { color: #b03a2e; }
+    body.classic .gear-danger:hover { background: rgba(176,58,46,0.08); }
 
     body.classic .stats {
         background: linear-gradient(180deg, #4a5a42 0%, #3e4e38 100%);
@@ -639,6 +708,7 @@ cat > "$OUTPUT_FILE" << 'HTMLHEAD'
         border-color: #8aaa74;
     }
     body.classic .new-only-btn.active { background: linear-gradient(180deg, #4a8ab5 0%, #3a6a95 100%); border-color: #5a9ac5; }
+    body.classic .expiring-btn.active { background: linear-gradient(180deg, #b03a2e 0%, #8a2a1e 100%); border-color: #c04a3e; }
 
     body.classic .cat-filters { gap: 4px; margin-bottom: 10px; }
     body.classic .cat-btn { background: linear-gradient(180deg, #3a4a30 0%, #2a3a20 100%); border: 1px solid #4a5a40; color: #8a9a80; border-radius: 3px; font-family: Tahoma, sans-serif; font-size: 0.68rem; padding: 3px 10px; }
@@ -684,18 +754,6 @@ cat > "$OUTPUT_FILE" << 'HTMLHEAD'
     body.classic .up-badge { background: #b03a2e; }
     body.classic .down-badge { background: #1e8449; }
 
-    body.classic .clear-cache-btn {
-        background: linear-gradient(180deg, #8a4a42 0%, #6a3a32 100%);
-        border: 1px solid #9a5a52;
-        border-bottom: 1px solid #5a2a22;
-        color: #e8c0b0;
-        border-radius: 3px;
-        padding: 3px 12px;
-        font-family: Tahoma, sans-serif;
-        font-size: 0.72rem;
-    }
-    body.classic .clear-cache-btn:hover { background: linear-gradient(180deg, #9a5a52 0%, #7a4a42 100%); color: #fff; }
-
     body.classic .info { padding: 8px 10px 10px; gap: 4px; }
     body.classic .name { font-size: 0.8rem; font-weight: bold; font-family: Tahoma, sans-serif; color: #d2e8b0; }
     body.classic .genre-tag { font-size: 0.58rem; color: #8a9a80; background: rgba(0,0,0,0.2); border-radius: 2px; padding: 1px 5px; }
@@ -710,6 +768,85 @@ cat > "$OUTPUT_FILE" << 'HTMLHEAD'
     body.classic .price-filter input[type=range]::-webkit-slider-thumb { background: #7a9a64; border-color: #1e2a16; }
     body.classic .price-filter input[type=range]::-moz-range-thumb { background: #7a9a64; border-color: #1e2a16; }
     body.classic .price-val { color: #a4d007; font-family: Tahoma, sans-serif; }
+
+    body.classic .end-date { font-family: Tahoma, sans-serif; font-size: 0.64rem; color: #8a9a80; }
+    body.classic .end-date-urgent { color: #c0392b; }
+
+    /* ════════════════════════════════════════════════════
+       THÈME LIGHT
+       ════════════════════════════════════════════════════ */
+    body.light { background: #f0f2f5; color: #37474f; }
+    body.light::before { background: radial-gradient(ellipse 60% 40% at 20% 10%, rgba(26,115,232,0.03) 0%, transparent 70%); }
+    body.light .container { max-width: 1300px; }
+    body.light .header { border-bottom-color: rgba(0,0,0,0.06); }
+    body.light .header h1 { color: #212121; }
+    body.light .header-right .count { color: #1a73e8; }
+    body.light .header-right span { color: #78909c; }
+
+    body.light .gear-btn { background: #fff; border: 1px solid rgba(0,0,0,0.1); color: #78909c; border-radius: 10px; }
+    body.light .gear-btn:hover { border-color: rgba(0,0,0,0.2); color: #37474f; }
+    body.light .gear-dropdown { background: #fff; border: 1px solid rgba(0,0,0,0.12); box-shadow: 0 8px 30px rgba(0,0,0,0.12); border-radius: 10px; }
+    body.light .gear-item { color: #78909c; }
+    body.light .gear-item:hover { background: rgba(0,0,0,0.03); color: #37474f; }
+    body.light .gear-item.active-theme { color: #1a73e8; }
+    body.light .gear-sep { background: rgba(0,0,0,0.06); }
+    body.light .gear-danger { color: #c62828; }
+    body.light .gear-danger:hover { background: rgba(198,40,40,0.04); }
+
+    body.light .stats { background: #fff; border: 1px solid rgba(0,0,0,0.06); border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+    body.light .stats span { color: #78909c; }
+    body.light .stats .val { color: #1a73e8; }
+    body.light .stats .val-green { color: #2e7d32; }
+
+    body.light .search-box input { background: #fff; border: 1px solid rgba(0,0,0,0.1); color: #37474f; border-radius: 24px; }
+    body.light .search-box input:focus { border-color: #1a73e8; box-shadow: 0 0 8px rgba(26,115,232,0.12); }
+    body.light .search-box input::placeholder { color: #b0bec5; }
+
+    body.light .toolbar button { background: #fff; border: 1px solid rgba(0,0,0,0.1); color: #78909c; }
+    body.light .toolbar button:hover { border-color: rgba(0,0,0,0.2); color: #37474f; }
+    body.light .toolbar button.active { background: #1a73e8; color: #fff; border-color: transparent; }
+
+    body.light .genre-btn { background: #fff; border: 1px solid rgba(0,0,0,0.08); color: #78909c; }
+    body.light .genre-btn:hover { background: rgba(46,125,50,0.06); color: #2e7d32; }
+    body.light .genre-btn.active { background: #2e7d32; color: #fff; border-color: transparent; }
+    body.light .new-only-btn.active { background: #1a73e8; }
+    body.light .expiring-btn.active { background: #c62828; }
+
+    body.light .cat-btn { background: #fff; border: 1px solid rgba(0,0,0,0.08); color: #78909c; }
+    body.light .cat-btn:hover { background: rgba(46,125,50,0.06); color: #2e7d32; }
+    body.light .cat-btn.active { background: #2e7d32; color: #fff; border-color: transparent; }
+
+    body.light .price-filter { border-left-color: rgba(0,0,0,0.08); }
+    body.light .price-filter label { color: #78909c; }
+    body.light .price-filter input[type=range] { background: rgba(26,115,232,0.1); }
+    body.light .price-filter input[type=range]::-webkit-slider-thumb { background: #1a73e8; border-color: #f0f2f5; }
+    body.light .price-filter input[type=range]::-moz-range-thumb { background: #1a73e8; border-color: #f0f2f5; }
+    body.light .price-val { color: #1a73e8; }
+
+    body.light .card { background: #fff; border: 1px solid rgba(0,0,0,0.06); border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+    body.light .card:hover { border-color: rgba(0,0,0,0.12); box-shadow: 0 6px 20px rgba(0,0,0,0.08); }
+    body.light .img-wrap { background: #e8eaed; }
+    body.light .name { color: #212121; }
+    body.light .genre-tag { background: rgba(0,0,0,0.04); color: #78909c; }
+    body.light .old { color: #b0bec5; }
+    body.light .new { color: #2e7d32; text-shadow: none; }
+
+    body.light .badge-high { background: #2e7d32; color: #fff; }
+    body.light .badge-mid { background: #ef6c00; color: #fff; }
+    body.light .badge-low { background: #c62828; }
+    body.light .new-badge { background: #1a73e8; }
+    body.light .up-badge { background: #c62828; }
+    body.light .down-badge { background: #2e7d32; }
+    body.light .status-badge { text-shadow: none; }
+
+    body.light .metacritic.mc-high { background: #2e7d32; }
+    body.light .metacritic.mc-mid { background: #f9a825; color: #333; }
+    body.light .metacritic.mc-low { background: #c62828; }
+
+    body.light .end-date { color: #78909c; }
+    body.light .end-date-urgent { color: #c62828; }
+
+    body.light .empty { color: #b0bec5; }
 </style>
 </head>
 <body>
@@ -724,12 +861,19 @@ HTMLHEAD
 cat >> "$OUTPUT_FILE" << HTMLMETA
         <span class="count" id="count">${SALE_COUNT} jeu$([ "$SALE_COUNT" -gt 1 ] && echo "x") en promo</span>
         <span>Mis à jour le ${NOW} (${ELAPSED}s)</span>
-        <button class="theme-btn" id="themeToggle" onclick="toggleTheme()">🖥️ Classic Steam</button>
-        <button class="clear-cache-btn" onclick="clearCache()">🗑️ Vider le cache</button>
-        <a class="refresh-btn" href="run.php">
-            <span class="refresh-icon">↻</span>
-            Actualiser
-        </a>
+        <div class="gear-wrap" id="gearWrap">
+            <button class="gear-btn" onclick="this.parentElement.classList.toggle('open')">&#9881;</button>
+            <div class="gear-dropdown">
+                <a class="gear-item" href="run.php"><span class="g-ico">&#8635;</span> Actualiser le scan</a>
+                <button class="gear-item gear-danger" onclick="clearCache()"><span class="g-ico">&#128465;</span> Vider le cache</button>
+                <div class="gear-sep"></div>
+                <button class="gear-item" id="thModern" onclick="setTheme('modern')"><span class="g-ico">&#10024;</span> Thème Modern</button>
+                <button class="gear-item" id="thClassic" onclick="setTheme('classic')"><span class="g-ico">&#128421;</span> Thème Classic Steam</button>
+                <button class="gear-item" id="thLight" onclick="setTheme('light')"><span class="g-ico">&#9728;</span> Thème Light</button>
+                <div class="gear-sep"></div>
+                <a class="gear-item" href="https://steamdb.info/sales/history/" target="_blank" rel="noopener"><span class="g-ico">&#128197;</span> Calendrier des Soldes</a>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -763,6 +907,7 @@ cat >> "$OUTPUT_FILE" << HTMLMETA
 <div class="genre-filters" id="genreFilters">
     <button class="genre-btn active" data-genre="all">Tous</button>
     <button class="genre-btn new-only-btn" id="newOnlyBtn" onclick="toggleNewOnly()">🆕 Nouveautés</button>
+    <button class="genre-btn expiring-btn" id="expiringBtn" onclick="toggleExpiring()" style="display:none">⏳ Expire bientôt</button>
     ${GENRE_BUTTONS}
 </div>
 
@@ -828,6 +973,7 @@ function applyFilters() {
     const q = document.getElementById('search').value.toLowerCase();
     const pMax = parseInt(document.getElementById('priceMax').value) * 100;
     document.getElementById('priceLabel').textContent = document.getElementById('priceMax').value + '\u20ac';
+    var now72 = Date.now() + 259200000;
     let visible = 0;
     document.querySelectorAll('.card').forEach(c => {
         const name = c.querySelector('.name').textContent.toLowerCase();
@@ -835,12 +981,14 @@ function applyFilters() {
         const cats = (c.dataset.cats || '').toLowerCase();
         const badge = c.dataset.badge || '';
         const price = parseInt(c.dataset.sale) || 0;
+        const endTs = parseInt(c.dataset.endts || '0') * 1000;
         const matchSearch = name.includes(q);
         const matchGenre = activeGenre === 'all' || genres.split(',').some(g => g.trim().toLowerCase() === activeGenre.toLowerCase());
         const matchCat = activeCat === 'all' || cats.split(',').some(ct => ct.trim().toLowerCase() === activeCat.toLowerCase());
         const matchNew = !showNewOnly || badge === 'new';
+        const matchExpiring = !showExpiring || (endTs > 0 && endTs <= now72 && endTs > Date.now());
         const matchPrice = price <= pMax;
-        const show = matchSearch && matchGenre && matchCat && matchNew && matchPrice;
+        const show = matchSearch && matchGenre && matchCat && matchNew && matchExpiring && matchPrice;
         c.style.display = show ? '' : 'none';
         if (show) visible++;
     });
@@ -849,11 +997,26 @@ function applyFilters() {
 
 document.getElementById('priceMax').addEventListener('input', applyFilters);
 
-document.getElementById('search').addEventListener('input', applyFilters);
+document.getElementById('search').addEventListener('input', function() {
+    var v = this.value.trim();
+    if (v === 'swsc:endofsales-on') {
+        this.value = '';
+        document.cookie = 'swsc_endofsales=on;path=/;max-age=31536000';
+        fetch('run.php?endofsales=on').then(function() { window.location.href = 'run.php'; });
+        return;
+    }
+    if (v === 'swsc:endofsales-off') {
+        this.value = '';
+        document.cookie = 'swsc_endofsales=;path=/;max-age=0';
+        fetch('run.php?endofsales=off').then(function() { location.reload(); });
+        return;
+    }
+    applyFilters();
+});
 
-document.querySelectorAll('.genre-btn:not(.new-only-btn)').forEach(btn => {
+document.querySelectorAll('.genre-btn:not(.new-only-btn):not(.expiring-btn)').forEach(btn => {
     btn.addEventListener('click', () => {
-        document.querySelectorAll('.genre-btn:not(.new-only-btn)').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.genre-btn:not(.new-only-btn):not(.expiring-btn)').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         activeGenre = btn.dataset.genre;
         applyFilters();
@@ -873,47 +1036,56 @@ document.querySelectorAll('.cat-btn').forEach(btn => {
 function clearCache() {
     if (confirm('⚠️ Vider le cache ?\n\nLe prochain scan sera plus long car toutes les informations des jeux devront être récupérées à nouveau depuis Steam.\n\nContinuer ?')) {
         fetch('run.php?clear-cache=1').then(function() {
-            var btn = document.querySelector('.clear-cache-btn');
-            btn.textContent = '✅ Cache vidé !';
-            btn.style.color = '#a4d007';
-            btn.style.borderColor = 'rgba(164,208,7,0.3)';
-            setTimeout(function() { btn.innerHTML = '🗑️ Vider le cache'; btn.style.color = ''; btn.style.borderColor = ''; }, 3000);
+            var item = document.querySelector('.gear-danger');
+            var old = item.innerHTML;
+            item.innerHTML = '<span class="g-ico">✅</span> Cache vidé !';
+            setTimeout(function() { item.innerHTML = old; }, 3000);
         });
     }
 }
 
 // ── Filtre Nouveautés ──
 let showNewOnly = false;
+let showExpiring = false;
 function toggleNewOnly() {
     showNewOnly = !showNewOnly;
     const btn = document.getElementById('newOnlyBtn');
     if (showNewOnly) { btn.classList.add('active'); } else { btn.classList.remove('active'); }
     applyFilters();
 }
+function toggleExpiring() {
+    showExpiring = !showExpiring;
+    const btn = document.getElementById('expiringBtn');
+    if (showExpiring) { btn.classList.add('active'); } else { btn.classList.remove('active'); }
+    applyFilters();
+}
 
-// ── Switch de thème (Modern ↔ Classic Steam) ──
-function toggleTheme() {
-    const body = document.body;
-    const btn = document.getElementById('themeToggle');
-    if (body.classList.contains('classic')) {
-        body.classList.remove('classic');
-        btn.innerHTML = '🖥️ Classic Steam';
-        document.cookie = 'theme=modern;path=/;max-age=31536000';
-    } else {
-        body.classList.add('classic');
-        btn.innerHTML = '✨ Modern';
-        document.cookie = 'theme=classic;path=/;max-age=31536000';
-    }
+// ── Switch de thème via roue crantée ──
+function setTheme(theme) {
+    document.body.className = (theme === 'classic') ? 'classic' : (theme === 'light') ? 'light' : '';
+    document.cookie = 'theme=' + theme + ';path=/;max-age=31536000';
+    document.querySelectorAll('.gear-item[id^="th"]').forEach(function(el) { el.classList.remove('active-theme'); });
+    var id = theme === 'classic' ? 'thClassic' : theme === 'light' ? 'thLight' : 'thModern';
+    document.getElementById(id).classList.add('active-theme');
 }
 
 // Restaurer le thème sauvegardé
 (function() {
     const m = document.cookie.match(/theme=(\w+)/);
-    if (m && m[1] === 'classic') {
-        document.body.classList.add('classic');
-        document.getElementById('themeToggle').innerHTML = '✨ Modern';
+    if (m) {
+        if (m[1] === 'classic') { document.body.classList.add('classic'); }
+        else if (m[1] === 'light') { document.body.classList.add('light'); }
     }
+    var active = (m && m[1] === 'classic') ? 'thClassic' : (m && m[1] === 'light') ? 'thLight' : 'thModern';
+    document.querySelectorAll('.gear-item[id^="th"]').forEach(function(el) { el.classList.remove('active-theme'); });
+    document.getElementById(active).classList.add('active-theme');
 })();
+
+// Fermer le gear menu quand on clique ailleurs
+document.addEventListener('click', function(e) {
+    var gw = document.getElementById('gearWrap');
+    if (gw && !gw.contains(e.target)) gw.classList.remove('open');
+});
 
 // ── Prochain scan auto ──
 (function() {
@@ -942,6 +1114,51 @@ function toggleTheme() {
     update();
     setInterval(update, 60000);
 })();
+
+// ── Dates de fin de promo (si activé) ──
+if (document.cookie.includes('swsc_endofsales=on')) {
+    fetch('sale_dates.json').then(function(r) { return r.json(); }).then(function(dates) {
+        var countdownEls = [];
+        var hasAny = false;
+        document.querySelectorAll('.card').forEach(function(card) {
+            var m = card.href.match(/\/app\/(\d+)/);
+            if (m && dates[m[1]]) {
+                card.dataset.endts = dates[m[1]];
+                var el = document.createElement('span');
+                el.className = 'end-date';
+                el.dataset.endTs = dates[m[1]];
+                card.querySelector('.info').appendChild(el);
+                countdownEls.push(el);
+                hasAny = true;
+            }
+        });
+        if (hasAny) { document.getElementById('expiringBtn').style.display = ''; }
+        function updateCountdowns() {
+            var now = Date.now();
+            countdownEls.forEach(function(el) {
+                var endMs = parseInt(el.dataset.endTs) * 1000;
+                var diff = endMs - now;
+                if (diff <= 0) {
+                    el.textContent = '\u23f3 Termin\u00e9e !';
+                    el.className = 'end-date end-date-urgent';
+                    return;
+                }
+                var d = Math.floor(diff / 86400000);
+                var h = Math.floor((diff % 86400000) / 3600000);
+                var m = Math.floor((diff % 3600000) / 60000);
+                var s = Math.floor((diff % 60000) / 1000);
+                var txt = '\u23f3 ';
+                if (d > 0) txt += d + 'j ' + h + 'h ' + m + 'min';
+                else if (h > 0) txt += h + 'h ' + ('0'+m).slice(-2) + 'min ' + ('0'+s).slice(-2) + 's';
+                else txt += m + 'min ' + ('0'+s).slice(-2) + 's';
+                el.textContent = txt;
+                el.className = (diff <= 259200000) ? 'end-date end-date-urgent' : 'end-date';
+            });
+        }
+        updateCountdowns();
+        setInterval(updateCountdowns, 1000);
+    }).catch(function() {});
+}
 </script>
 
 </div>

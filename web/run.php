@@ -23,6 +23,23 @@ if (isset($_GET['clear-cache']) && $_GET['clear-cache'] === '1') {
     exit;
 }
 
+// Flag dates de fin de promo
+if (isset($_GET['endofsales'])) {
+    $flagFile = __DIR__ . '/endofsales.flag';
+    $datesFile = __DIR__ . '/sale_dates.json';
+    if ($_GET['endofsales'] === 'on') {
+        touch($flagFile);
+        chmod($flagFile, 0644);
+        // Ne pas exit — continuer vers le lancement du scan
+    } elseif ($_GET['endofsales'] === 'off') {
+        if (file_exists($flagFile)) { unlink($flagFile); }
+        if (file_exists($datesFile)) { unlink($datesFile); }
+        header('Content-Type: text/plain');
+        echo 'End-of-sales disabled';
+        exit;
+    }
+}
+
 // Si un scan tourne déjà, rediriger directement vers update.php
 $startingFile = '/tmp/steam-wishlist-starting';
 if (file_exists($lockFile) || file_exists($startingFile)) {

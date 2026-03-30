@@ -2,6 +2,72 @@
 
 ---
 
+## v1.4 — 28/03/2026
+
+### 🇫🇷 Français
+
+#### ✨ Nouvelles fonctionnalités
+
+**Dates de fin de promotion (optionnel, countdown en temps réel)**
+Une fonction optionnelle scrape les pages store Steam pour récupérer les dates de fin de promotion. Un countdown en temps réel s'affiche sous chaque carte ("⏳ 2j 5h 34min" qui défile chaque seconde). Les promos expirant dans ≤3 jours sont en rouge gras. Le scraping supporte deux patterns Steam : le timestamp `InitDailyDealTimer` (précis à la seconde) et le texte "prend fin le DD mois" / "Offer ends DD month" (français + anglais, heure fixée à 18:00). Activation Linux : `swsc:endofsales-on` dans la barre de recherche. PowerShell : `-ScrapeEndDates`.
+
+**Filtre "Expire bientôt"**
+Un bouton rouge "⏳ Expire bientôt" apparaît automatiquement quand des dates de fin sont disponibles. Affiche uniquement les jeux dont la promo expire dans moins de 48 heures. Se combine avec tous les autres filtres (recherche, genre, catégorie, prix, nouveautés).
+
+**Roue crantée (⚙️)**
+Les boutons "Classic Steam", "Vider le cache" et "Actualiser" sont remplacés par un menu ⚙️. Regroupe : Actualiser le scan, Vider le cache (en rouge), choix de thème avec checkmark, et un lien "Calendrier des Soldes" vers SteamDB.
+
+**Thème Light (☀️)**
+Nouveau thème clair : fond #f0f2f5, cartes blanches, accent bleu #1a73e8, vert #2e7d32. Complet sur tous les éléments (cartes, filtres, stats, gear menu, slider, badges, countdown). Persistant via cookie.
+
+#### 🔧 Modifications techniques
+
+- **Bash** : variables `ENDOFSALES_FLAG` / `SALE_DATES_FILE`, étape 6 de scraping avec double pattern (regex `InitDailyDealTimer` + grep `prend fin le|Offer ends`), conversion FR→EN des mois via sed, `sale_dates.json`, JS countdown via `setInterval(1000)`, cookie `swsc_endofsales`, `data-endts` sur les cartes, filtre `matchExpiring` (48h), bouton `expiringBtn` auto-visible, `setTheme()` 3 thèmes, menu gear avec `click` hors zone pour fermer, CSS Light complet (59 règles).
+- **PowerShell** : paramètre `-ScrapeEndDates`, scraping avec double pattern (regex + mapping 24 mois FR/EN), `$SaleDates` → `SALE_DATES` injecté dans le HTML, countdown identique, `toggleExpiring()`, CSS Light identique, gear menu identique.
+- **run.php** : handler `endofsales=on` (crée flag + lance scan) et `off` (supprime flag + données).
+
+#### 📊 Métriques
+
+| Fichier | v1.3 | v1.4 | Delta |
+|---|---|---|---|
+| `steam-wishlist-sales.sh` | 958 lignes | 1175 lignes | +217 |
+| `SteamWishlistSales.ps1` | 741 lignes | 945 lignes | +204 |
+| `run.php` | 48 lignes | 65 lignes | +17 |
+
+---
+
+### 🇬🇧 English
+
+#### ✨ New features
+
+**End-of-sale dates (optional, live countdown)**
+An optional feature scrapes Steam store pages to retrieve promotion end dates. A live countdown displays below each card ("⏳ 2d 5h 34min" ticking every second). Promos expiring within ≤3 days are shown in bold red. Scraping supports two Steam patterns: the `InitDailyDealTimer` timestamp (precise to the second) and the text "prend fin le DD month" / "Offer ends DD month" (French + English, time defaults to 18:00). Linux activation: `swsc:endofsales-on` in the search bar. PowerShell: `-ScrapeEndDates`.
+
+**"Expiring soon" filter**
+A red "⏳ Expire bientôt" button automatically appears when end dates are available. Displays only games whose promo expires within 48 hours. Combines with all other filters (search, genre, category, price, new).
+
+**Gear menu (⚙️)**
+"Classic Steam", "Clear cache" and "Refresh" buttons replaced by a ⚙️ dropdown menu. Groups: Refresh scan, Clear cache (red), theme selection with checkmark, and a "Sales Calendar" link to SteamDB.
+
+**Light theme (☀️)**
+New light theme: #f0f2f5 background, white cards, blue #1a73e8 accent, green #2e7d32. Complete coverage of all elements (cards, filters, stats, gear menu, slider, badges, countdown). Persisted via cookie.
+
+#### 🔧 Technical changes
+
+- **Bash**: `ENDOFSALES_FLAG` / `SALE_DATES_FILE` variables, step 6 scraping with dual pattern (regex `InitDailyDealTimer` + grep `prend fin le|Offer ends`), FR→EN month conversion via sed, `sale_dates.json`, JS countdown via `setInterval(1000)`, `swsc_endofsales` cookie, `data-endts` on cards, `matchExpiring` filter (48h), auto-visible `expiringBtn`, `setTheme()` for 3 themes, gear menu with outside-click close, full Light CSS (59 rules).
+- **PowerShell**: `-ScrapeEndDates` parameter, dual pattern scraping (regex + 24-month FR/EN mapping), `$SaleDates` → `SALE_DATES` injected into HTML, identical countdown, `toggleExpiring()`, identical Light CSS, identical gear menu.
+- **run.php**: `endofsales=on` handler (creates flag + triggers scan) and `off` (deletes flag + data).
+
+#### 📊 Metrics
+
+| File | v1.3 | v1.4 | Delta |
+|---|---|---|---|
+| `steam-wishlist-sales.sh` | 958 lines | 1175 lines | +217 |
+| `SteamWishlistSales.ps1` | 741 lines | 945 lines | +204 |
+| `run.php` | 48 lines | 65 lines | +17 |
+
+---
+
 ## v1.3 — 04/03/2026
 
 ### 🇫🇷 Français
