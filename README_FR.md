@@ -66,6 +66,7 @@ Le script d'installation vous demandera :
 .\SteamWishlistSales.ps1 -SteamID 76561198040773990
 .\SteamWishlistSales.ps1 -SteamID 76561198040773990 -Country us
 .\SteamWishlistSales.ps1 76561198040773990 -ClearCache
+.\SteamWishlistSales.ps1 76561198040773990 -ScrapeEndDates
 ```
 
 Le script génère un fichier HTML dans `%TEMP%` et l'ouvre automatiquement dans le navigateur. Le cache est stocké dans `%APPDATA%\SteamWishlistSales\`.
@@ -76,6 +77,7 @@ Le script génère un fichier HTML dans `%TEMP%` et l'ouvre automatiquement dans
 | **Country** | Code pays pour les prix | `fr` |
 | **OutputPath** | Chemin du HTML généré | `%TEMP%\steam-wishlist-sales.html` |
 | **ClearCache** | Vider le cache avant le scan | désactivé |
+| **ScrapeEndDates** | Ajoute la date de fin de la promo | désactivé |
 
 ## Installation manuelle (Linux)
 
