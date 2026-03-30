@@ -5,21 +5,26 @@ Code généré avec Claude (Anthropic). Ceci est un projet d'apprentissage pour 
 Surveille automatiquement votre wishlist Steam et affiche les jeux en promotion sur une page web élégante, auto-hébergée.
 
 ![Steam Wishlist Sales](screenshots/preview.png)
+![Steam Wishlist Sales](screenshots/preview2.png)
 
 ## Fonctionnalités
 
-- **Scan automatique** de la wishlist via l'API Steam (toutes les 6h par défaut)
-- **Badges de suivi** : badge bleu **NEW** pour les nouveaux jeux en promo, badge rouge **Prix 🔼** si le prix a augmenté, badge vert **Prix 🔽** si le prix a baissé depuis le dernier scan
-- **Filtrer par nouveautés** : affiche uniquement les nouveaux jeux en promotion
-- **Date de fin de la promotion** : affiche la date de fin de la promotion (dans la barre de recherche, entrer 'swsc:endofsales-on' pour activer, 'off' pour désactiver)
-- **Cache intelligent** : seuls les nouveaux jeux en promo déclenchent des appels API, les autres sont lus depuis le cache local (scans 5x plus rapides)
-- **Bouton vider le cache** (Linux/PHP) : un clic pour tout réinitialiser, avec confirmation
-- **Filtres par genre** : Action, RPG, Indie... combinables avec la recherche textuelle
-- **Double thème** : Modern (par défaut) ou Classic Steam rétro (2004-2010), persistant via cookie
-- **Page web auto-hébergée** avec un design inspiré de Steam
-- **Tri** : alphabétique, prix croissant/décroissant, % de promotion
+- **Scan automatique** de la wishlist via l'API Steam (toutes les 6h par défaut, configurable)
+- **Badges de suivi** : badge bleu **NEW** pour les nouveaux jeux en promo, badge rouge **Prix 🔼** si le prix a augmenté, badge vert **Prix 🔽** si le prix a baissé
+- **Badge de remise coloré** : vert (≥70%), orange (30-69%), rouge (<30%)
+- **Score Metacritic** : badge coloré vert/jaune/rouge affiché à côté du prix
+- **Description au survol** : tooltip affichant la description courte du jeu
+- **Filtres par genre** : Action, RPG, Indie, Racing, Strategy... (21 genres)
+- **Filtres par catégorie** : Solo, Multijoueur, Co-op, PvP, MMO, LAN, Écran partagé...
+- **Filtre Nouveautés** : affiche uniquement les nouveaux jeux en promotion
+- **⏳ Filtre "Expire bientôt"** : affiche les promos expirant dans moins de 72h
+- **Dates de fin de promo** (optionnel) : countdown en temps réel "⏳ 2j 5h 34min" qui défile chaque seconde
+- **Slider de prix** : filtrer les jeux en dessous d'un prix maximum
+- **Cache intelligent** : seuls les nouveaux jeux en promo déclenchent des appels API (scans 5x plus rapides)
+- **Tri** : A→Z, Z→A, prix croissant/décroissant, % promo, score Metacritic
 - **Recherche** en temps réel par nom de jeu
-- **Bouton d'actualisation manuelle** avec suivi en direct du scan
+- **3 thèmes** : Modern (défaut), Classic Steam rétro (2004-2010), Light (☀️) — persistants via cookie
+- **⚙️ Roue crantée** : menu unifié pour actualiser, vider le cache, changer de thème, calendrier des soldes
 - **Statistiques** : nombre de promos, meilleure remise, prix le plus bas, prochain scan
 - **Responsive** : s'adapte au mobile et au desktop
 - **Léger** : page HTML statique, pas de base de données
@@ -67,6 +72,7 @@ Le script d'installation vous demandera :
 .\SteamWishlistSales.ps1 -SteamID 76561198040773990 -Country us
 .\SteamWishlistSales.ps1 76561198040773990 -ClearCache
 .\SteamWishlistSales.ps1 76561198040773990 -ScrapeEndDates
+.\SteamWishlistSales.ps1 76561198040773990 -ClearCache -ScrapeEndDates
 ```
 
 Le script génère un fichier HTML dans `%TEMP%` et l'ouvre automatiquement dans le navigateur. Le cache est stocké dans `%APPDATA%\SteamWishlistSales\`.
@@ -77,7 +83,36 @@ Le script génère un fichier HTML dans `%TEMP%` et l'ouvre automatiquement dans
 | **Country** | Code pays pour les prix | `fr` |
 | **OutputPath** | Chemin du HTML généré | `%TEMP%\steam-wishlist-sales.html` |
 | **ClearCache** | Vider le cache avant le scan | désactivé |
-| **ScrapeEndDates** | Ajoute la date de fin de la promo | désactivé |
+| **ScrapeEndDates** | Scraper les dates de fin de promotion | désactivé |
+
+## Dates de fin de promotion (optionnel)
+
+Le scraping des dates de fin est une fonction optionnelle qui ajoute un countdown en temps réel sur chaque carte de jeu.
+
+### Activation sur Linux
+
+Tapez `swsc:endofsales-on` dans la barre de recherche puis Entrée. Cela crée un flag, lance un scan avec scraping et affiche les dates. Les scans cron suivants scraperont aussi tant que le flag existe. Pour désactiver : tapez `swsc:endofsales-off`.
+
+### Activation sur PowerShell
+
+```powershell
+.\SteamWishlistSales.ps1 76561198040773990 -ScrapeEndDates
+```
+
+### Fonctionnement
+
+Le scraping récupère les dates de fin via deux patterns Steam :
+- **Pattern 1** : `InitDailyDealTimer` — timestamp Unix précis
+- **Pattern 2** : texte "prend fin le 6 avril" / "Offer ends 6 April" — FR + EN supportés
+
+⚠️ Le scraping est lent (~1 req/s par jeu) et repose sur le HTML public de Steam. Si Steam modifie son markup, `swsc:endofsales-off` ou retirer `-ScrapeEndDates` désactive tout proprement sans impacter le reste.
+
+## Commandes spéciales (barre de recherche Linux)
+
+| Commande | Action |
+|---|---|
+| `swsc:endofsales-on` | Active le scraping des dates de fin + lance un scan |
+| `swsc:endofsales-off` | Désactive le scraping et supprime les données |
 
 ## Installation manuelle (Linux)
 
@@ -98,7 +133,6 @@ sudo chmod +x /opt/steam-wishlist-sales/steam-wishlist-sales.sh
 sudo mkdir -p /var/www/steam-wishlist-sales
 sudo cp web/run.php web/update.php /var/www/steam-wishlist-sales/
 
-# Initialiser le cache
 echo '{}' | sudo tee /var/www/steam-wishlist-sales/cache.json
 sudo chmod 644 /var/www/steam-wishlist-sales/cache.json
 sudo chown www-data:www-data /var/www/steam-wishlist-sales/cache.json
@@ -108,176 +142,105 @@ sudo chown www-data:www-data /var/www/steam-wishlist-sales/cache.json
 
 ```bash
 sudo nano /opt/steam-wishlist-sales/steam-wishlist-sales.sh
-```
-
-```bash
-STEAM_ID="VOTRE_STEAM_ID_ICI"
+# Modifier : STEAM_ID="VOTRE_STEAM_ID_ICI"
 ```
 
 ### 4. Configurer Apache
 
-Créez le fichier `/etc/apache2/sites-available/steam-wishlist-sales.conf` :
+Créez `/etc/apache2/sites-available/steam-wishlist-sales.conf` :
 
 ```apache
 <VirtualHost *:2251>
     DocumentRoot /var/www/steam-wishlist-sales
     DirectoryIndex index.html
-
     <Directory /var/www/steam-wishlist-sales>
         Options -Indexes +FollowSymLinks
         AllowOverride None
         Require all granted
     </Directory>
-
     <FilesMatch "\.(html|php)$">
         Header set Cache-Control "no-cache, no-store, must-revalidate"
         Header set Pragma "no-cache"
         Header set Expires "0"
     </FilesMatch>
-
     ErrorLog ${APACHE_LOG_DIR}/steam-wishlist-sales-error.log
     CustomLog ${APACHE_LOG_DIR}/steam-wishlist-sales-access.log combined
 </VirtualHost>
 ```
 
-Ajoutez le port dans `/etc/apache2/ports.conf` :
+Ajoutez le port dans `/etc/apache2/ports.conf` (**pas** dans le vhost !) :
 
 ```bash
 echo "Listen 2251" >> /etc/apache2/ports.conf
-```
-
-```bash
 sudo a2enmod headers
 sudo a2ensite steam-wishlist-sales
 sudo systemctl restart apache2
 ```
 
-### 5. Configurer les permissions
+### 5. Permissions et cron
 
 ```bash
 echo "www-data ALL=(ALL) NOPASSWD: /opt/steam-wishlist-sales/steam-wishlist-sales.sh" | sudo tee /etc/sudoers.d/steam-wishlist-sales
 sudo chmod 440 /etc/sudoers.d/steam-wishlist-sales
+
+# Ajouter le cron (4 scans/jour)
+(crontab -l 2>/dev/null; echo "5 1,7,13,19 * * * /opt/steam-wishlist-sales/steam-wishlist-sales.sh > /tmp/steam-wishlist-current.log 2>&1") | crontab -
 ```
 
-### 6. Configurer le cron
-
-```bash
-crontab -e
-```
-
-```
-5 1,7,13,19 * * * /opt/steam-wishlist-sales/steam-wishlist-sales.sh > /tmp/steam-wishlist-current.log 2>&1
-```
-
-### 7. Premier scan
+### 6. Premier scan
 
 ```bash
 sudo /opt/steam-wishlist-sales/steam-wishlist-sales.sh
 ```
 
-Le premier scan récupère tous les jeux (~5 min pour ~1500 jeux). Les suivants sont bien plus rapides grâce au cache.
-
-## Utilisation
-
-### Accéder à la page
-
-```
-http://VOTRE_IP:2251/
-```
-
-### Fonctionnalités de la page
-
-- **Tri** : boutons A→Z, Prix ↑, Prix ↓, % Promo
-- **Recherche** : barre de recherche en temps réel
-- **Filtres genre** : cliquez sur un genre pour filtrer (combinable avec la recherche)
-- **Thème** : bouton Classic Steam / Modern dans le header (sauvegardé via cookie)
-- **Actualisation** : bouton ↻ Actualiser avec log en direct
-- **Prochain scan** : compte à rebours dans la barre de statistiques
-- **Lien Steam** : cliquez sur une carte pour ouvrir la page Steam du jeu
-
 ## Architecture
 
 ```
 steam-wishlist-sales/
-├── install.sh                     # Script d'installation automatique
-├── uninstall.sh                   # Script de désinstallation
+├── install.sh                     # Installation automatique
+├── uninstall.sh                   # Désinstallation
 ├── SteamWishlistSales.ps1         # Version Windows (standalone)
-├── README.md                      # Ce fichier
-├── README_EN.md                   # README en anglais
+├── README.md / README_EN.md       # Documentation FR/EN
 ├── CHANGELOG.md                   # Historique des versions
-├── LICENSE
-├── screenshots/
-│   └── preview.png
 ├── scripts/
-│   └── steam-wishlist-sales.sh    # Script principal de scan
+│   └── steam-wishlist-sales.sh    # Script principal (7 étapes)
 └── web/
-    ├── run.php                    # Déclencheur de scan manuel
-    └── update.php                 # Page de suivi du scan en cours
+    ├── run.php                    # Déclencheur de scan + gestion flags
+    └── update.php                 # Suivi en direct du scan
 ```
 
-### Fichiers générés à l'exécution
+### Fichiers générés
 
 ```
 /var/www/steam-wishlist-sales/
 ├── index.html                     # Page HTML générée
-└── cache.json                     # Cache des noms/images/genres
+├── cache.json                     # Cache noms/images/genres/metacritic/desc/cats
+├── previous_sales.json            # Snapshot des prix (badges)
+├── sale_dates.json                # Dates de fin de promo (optionnel)
+└── endofsales.flag                # Flag du scraping (optionnel)
 ```
-
-### Fonctionnement technique
-
-Le script `steam-wishlist-sales.sh` fonctionne en 5 étapes :
-
-1. **Wishlist** — Récupère la liste complète des app IDs via `IWishlistService/GetWishlist` (1 appel API)
-2. **Prix** — Récupère les prix par lots de 30 via `appdetails?filters=price_overview` (~46 appels)
-3. **Filtrage** — Identifie les jeux ayant un `discount_percent > 0`
-4. **Noms/Genres** — Consulte le cache, puis récupère uniquement les jeux manquants via `appdetails` (genres extraits de `.data.genres[]`)
-5. **HTML** — Génère la page `index.html` avec grille, filtres genre, double thème CSS, et JavaScript interactif
 
 ### Durée d'un scan
 
-| Wishlist | Premier scan | Scans suivants (cache) |
-|---|---|---|
-| ~500 jeux | ~2min | ~20s |
-| ~1000 jeux | ~4min | ~30s |
-| ~1500 jeux | ~5min | ~1min |
-
-### API Steam utilisées
-
-| Endpoint | Usage | Auth requise |
-|---|---|---|
-| `IWishlistService/GetWishlist/v1/` | Liste des app IDs de la wishlist | Non (profil public) |
-| `store.steampowered.com/api/appdetails` | Prix, noms, images, genres | Non |
+| Wishlist | Premier scan | Scans suivants | Avec end-of-sales |
+|---|---|---|---|
+| ~500 jeux | ~2min | ~20s | +2min |
+| ~1000 jeux | ~4min | ~30s | +3min |
+| ~1500 jeux | ~5min | ~1min | +5min |
 
 ## Dépannage
 
 ### Le scan ne trouve aucun jeu
+Vérifiez que votre profil et wishlist Steam sont publics. Testez : `curl -sL "https://api.steampowered.com/IWishlistService/GetWishlist/v1/?steamid=VOTRE_ID"`
 
-- Vérifiez que votre **profil Steam est public**
-- Vérifiez que votre **wishlist est publique**
-- Testez : `curl -sL "https://api.steampowered.com/IWishlistService/GetWishlist/v1/?steamid=VOTRE_ID"`
+### Metacritic/description ne s'affichent pas
+Ces champs ont été ajoutés en v1.3. Videz le cache une fois : `-ClearCache` (PS) ou bouton dans ⚙️ (Linux).
 
-### Le cache semble corrompu
+### Les dates de fin ne s'affichent pas
+Vérifiez que le scraping est activé. Toutes les promos n'ont pas de date de fin — les grosses soldes saisonnières n'utilisent pas de countdown individuel.
 
-```bash
-# Linux
-sudo rm /var/www/steam-wishlist-sales/cache.json
-echo '{}' | sudo tee /var/www/steam-wishlist-sales/cache.json
-sudo chown www-data:www-data /var/www/steam-wishlist-sales/cache.json
-```
-
-```powershell
-# Windows
-.\SteamWishlistSales.ps1 76561198040773990 -ClearCache
-```
-
-### Le bouton Actualiser ne fonctionne pas
-
-- Vérifiez les permissions sudo : `sudo -u www-data sudo /opt/steam-wishlist-sales/steam-wishlist-sales.sh`
-- Vérifiez les logs : `tail -f /var/log/apache2/steam-wishlist-sales-error.log`
-
-### Erreur de parsing PowerShell
-
-Le script PowerShell doit être encodé en UTF-8 avec BOM. Si vous éditez le fichier, sauvegardez-le en "UTF-8 with BOM" dans votre éditeur.
+### Erreur UTF-8 PowerShell
+Le script doit être encodé en UTF-8 avec BOM. Sauvegardez en "UTF-8 with BOM" si vous l'éditez.
 
 ## Désinstallation
 
