@@ -12,7 +12,7 @@ Automatically monitors your Steam wishlist and displays discounted games on a sl
 - **Automatic scanning** of your wishlist via the Steam API (every 6 hours by default)
 - **Tracking badges**: blue **NEW** badge for newly discounted games, red **Price 🔼** if price went up, green **Price 🔽** if price dropped since last scan
 - **Filter new only** : show only new discounted games
-- **End of sales remaining time** : check when the game is not on sale anymore (on search bar, add 'swsc:endofsales-on' to activate, 'off to deactivate)
+- **End of sales remaining time** : check when the game is not on sale anymore (on search bar, add 'swsc:endofsales-on' to activate, 'off' to deactivate)
 - **Smart cache**: only new sale entries trigger API calls; everything else is read from local cache (5x faster scans)
 - **Clear cache button** (Linux/PHP): one click to reset everything, with confirmation dialog
 - **Genre filters**: Action, RPG, Indie... combinable with text search
@@ -67,6 +67,7 @@ The installer will ask for:
 .\SteamWishlistSales.ps1 -SteamID 76561198040773990
 .\SteamWishlistSales.ps1 -SteamID 76561198040773990 -Country us
 .\SteamWishlistSales.ps1 76561198040773990 -ClearCache
+.\SteamWishlistSales.ps1 76561198040773990 -ScrapeEndDates
 ```
 
 The script generates an HTML file in `%TEMP%` and opens it in your default browser. Cache is stored in `%APPDATA%\SteamWishlistSales\`.
