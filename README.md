@@ -119,7 +119,7 @@ Scraping retrieves end dates via two Steam patterns:
 
 ```bash
 sudo apt update
-sudo apt install curl jq bc apache2 php libapache2-mod-php sudo
+sudo apt install curl jq bc apache2 php libapache2-mod-php
 ```
 
 ### 2. Copy files
