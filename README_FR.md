@@ -1,11 +1,10 @@
-# 🎮 Steam Wishlist Sales (v1.4)
+# 🎮 Steam Wishlist Sales (v2.0)
 
 Code généré avec Claude (Anthropic). Ceci est un projet d'apprentissage pour comprendre comment les commandes "curl" et "Invoke-RestMethod" peuvent récupérer des informations via l'API Steam. Un exécutable est également disponible pour Windows pour simplement vérifier les promotions de votre liste de souhaits Steam sans aucune installation, dans la page "Releases".
 
 Surveille automatiquement votre wishlist Steam et affiche les jeux en promotion sur une page web élégante, auto-hébergée.
 
-![Steam Wishlist Sales](screenshots/preview.png)
-![Steam Wishlist Sales](screenshots/preview2.png)
+![Steam Wishlist Sales](screenshots/preview.gif)
 
 ## Fonctionnalités
 
@@ -17,8 +16,8 @@ Surveille automatiquement votre wishlist Steam et affiche les jeux en promotion 
 - **Filtres par genre** : Action, RPG, Indie, Racing, Strategy... (21 genres)
 - **Filtres par catégorie** : Solo, Multijoueur, Co-op, PvP, MMO, LAN, Écran partagé...
 - **Filtre Nouveautés** : affiche uniquement les nouveaux jeux en promotion
-- **⏳ Filtre "Expire bientôt"** : affiche les promos expirant dans moins de 72h
-- **Dates de fin de promo** (optionnel) : countdown en temps réel "⏳ 2j 5h 34min" qui défile chaque seconde
+- **⏳ Filtre "Expire bientôt"** : affiche les promos expirant dans moins de 72h (si dates de fin activées)
+- **Dates de fin de promo** (optionnel, désactivé par défaut) : active le scraping des pages Steam pour récupérer les dates de fin. Un countdown en temps réel "⏳ 2j 5h 34min" s'affiche alors sous chaque carte. Activation : `swsc:endofsales-on` (Linux) ou `-ScrapeEndDates` (PowerShell/exe)
 - **Slider de prix** : filtrer les jeux en dessous d'un prix maximum
 - **Cache intelligent** : seuls les nouveaux jeux en promo déclenchent des appels API (scans 5x plus rapides)
 - **Tri** : A→Z, Z→A, prix croissant/décroissant, % promo, score Metacritic
@@ -28,7 +27,7 @@ Surveille automatiquement votre wishlist Steam et affiche les jeux en promotion 
 - **Statistiques** : nombre de promos, meilleure remise, prix le plus bas, prochain scan
 - **Responsive** : s'adapte au mobile et au desktop
 - **Léger** : page HTML statique, pas de base de données
-- **Version Windows** : script PowerShell standalone inclus
+- **Version Windows** : script PowerShell standalone inclus + **exécutable (.exe)** téléchargeable dans la page [Releases](https://github.com/W1p3out/steam-wishlist-sales-checker/releases)
 
 ## Prérequis
 
@@ -41,8 +40,8 @@ Surveille automatiquement votre wishlist Steam et affiche les jeux en promotion 
 
 ### Windows (version standalone)
 
-- **Windows 10/11** avec **PowerShell 5.1+**
-- Aucune autre dépendance
+- **Windows 10/11** avec **PowerShell 5.1+** (script .ps1)
+- Ou l'**exécutable (.exe)** disponible dans les [Releases](https://github.com/W1p3out/steam-wishlist-sales-checker/releases) — aucune dépendance requise
 
 ## Installation rapide (Linux en utilisateur root)
 
@@ -57,7 +56,7 @@ Le script d'installation vous demandera :
 
 | Paramètre | Description | Exemple |
 |---|---|---|
-| **Steam ID** | Votre identifiant Steam 64-bit (17 chiffres) | `76561198040773990` |
+| **Steam ID** | Votre identifiant Steam 64-bit (17 chiffres) | `12345678901234567` |
 | **Port** | Port du serveur web | `2251` |
 | **Heures de scan** | Heures de scan automatique (format cron) | `1,7,13,19` |
 
@@ -68,11 +67,11 @@ Le script d'installation vous demandera :
 ## Utilisation Windows (PowerShell)
 
 ```powershell
-.\SteamWishlistSales.ps1 -SteamID 76561198040773990
-.\SteamWishlistSales.ps1 -SteamID 76561198040773990 -Country us
-.\SteamWishlistSales.ps1 76561198040773990 -ClearCache
-.\SteamWishlistSales.ps1 76561198040773990 -ScrapeEndDates
-.\SteamWishlistSales.ps1 76561198040773990 -ClearCache -ScrapeEndDates
+.\Steam_Wishlist_Sales_Checker.ps1 -SteamID 12345678901234567
+.\Steam_Wishlist_Sales_Checker.ps1 -SteamID 12345678901234567 -Country us
+.\Steam_Wishlist_Sales_Checker.ps1 12345678901234567 -ClearCache
+.\Steam_Wishlist_Sales_Checker.ps1 12345678901234567 -ScrapeEndDates
+.\Steam_Wishlist_Sales_Checker.ps1 12345678901234567 -ClearCache -ScrapeEndDates
 ```
 
 Le script génère un fichier HTML dans `%TEMP%` et l'ouvre automatiquement dans le navigateur. Le cache est stocké dans `%APPDATA%\SteamWishlistSales\`.
@@ -96,7 +95,7 @@ Tapez `swsc:endofsales-on` dans la barre de recherche puis Entrée. Cela crée u
 ### Activation sur PowerShell
 
 ```powershell
-.\SteamWishlistSales.ps1 76561198040773990 -ScrapeEndDates
+.\Steam_Wishlist_Sales_Checker.ps1 12345678901234567 -ScrapeEndDates
 ```
 
 ### Fonctionnement
@@ -199,7 +198,7 @@ sudo /opt/steam-wishlist-sales/steam-wishlist-sales.sh
 steam-wishlist-sales/
 ├── install.sh                     # Installation automatique
 ├── uninstall.sh                   # Désinstallation
-├── SteamWishlistSales.ps1         # Version Windows (standalone)
+├── Steam_Wishlist_Sales_Checker.ps1         # Version Windows (standalone)
 ├── README.md / README_EN.md       # Documentation FR/EN
 ├── CHANGELOG.md                   # Historique des versions
 ├── scripts/
@@ -238,6 +237,13 @@ Ces champs ont été ajoutés en v1.3. Videz le cache une fois : `-ClearCache` (
 
 ### Les dates de fin ne s'affichent pas
 Vérifiez que le scraping est activé. Toutes les promos n'ont pas de date de fin — les grosses soldes saisonnières n'utilisent pas de countdown individuel.
+
+### Le bouton "Ouvrir sur Steam (Web)" n'ouvre pas tous les jeux
+
+Si seul le premier jeu s'ouvre, votre navigateur bloque l'ouverture de plusieurs onglets. Pour résoudre :
+- **Chrome/Edge** : cliquez sur l'icône de popup bloquée dans la barre d'adresse → "Toujours autoriser"
+- **Firefox** : cliquez sur la barre jaune en haut → "Autoriser les popups"
+- Désactivez votre **bloqueur de pubs** pour cette page si nécessaire
 
 ### Erreur UTF-8 PowerShell
 Le script doit être encodé en UTF-8 avec BOM. Sauvegardez en "UTF-8 with BOM" si vous l'éditez.

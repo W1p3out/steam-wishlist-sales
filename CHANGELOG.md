@@ -2,6 +2,58 @@
 
 ---
 
+## v2.0 — 30/03/2026
+
+### 🇫🇷 Français
+
+#### ✨ Refonte complète de l'interface
+
+**Sidebar latérale fixe** : les filtres genre et catégorie sont déplacés dans une barre latérale fixe de 220px à gauche. Chaque filtre affiche un compteur du nombre de jeux correspondants. La sidebar inclut les filtres rapides (Tout, Nouveautés, Expire bientôt), les genres et les modes de jeu. Sur mobile (< 900px), la sidebar se réduit à 48px avec icônes seules.
+
+**Stat cards en grille** : les statistiques passent d'une barre horizontale à 5 cartes individuelles en grille (Wishlist, En promo, Meilleure remise, Prix le plus bas, Prochain scan/Durée).
+
+**Topbar** : barre de recherche + compteur de promos + roue crantée ⚙️ dans une barre supérieure compacte.
+
+**Toolbar de tri** : boutons de tri avec le slider prix dans une barre dédiée sous les stats.
+
+**CSS unifié via variables** : les 3 thèmes (Modern, Classic Steam, Light) utilisent des variables CSS (:root) pour les couleurs, ce qui réduit le code de ~300 lignes de CSS dupliqué à ~100 lignes d'overrides.
+
+#### 📊 Métriques
+
+| Fichier | v1.4 | v2.0 | Delta |
+|---|---|---|---|
+| `steam-wishlist-sales.sh` | 1175 lignes | 959 lignes | -216 |
+| `Steam_Wishlist_Sales_Checker.ps1` | 945 lignes | 900 lignes | -45 |
+
+Le code est plus court malgré l'ajout de fonctionnalités car le CSS est mieux factorisé via les variables CSS.
+
+---
+
+### 🇬🇧 English
+
+#### ✨ Complete UI overhaul
+
+**Fixed sidebar**: genre and category filters moved to a fixed 220px left sidebar. Each filter shows a count of matching games. Sidebar includes quick filters (All, New, Expiring soon), genres and game modes. On mobile (< 900px), sidebar collapses to 48px icons.
+
+**Stat cards grid**: statistics moved from horizontal bar to 5 individual grid cards (Wishlist, On sale, Best discount, Lowest price, Next scan/Duration).
+
+**Topbar**: search bar + promo counter + ⚙️ gear menu in a compact top bar.
+
+**Sort toolbar**: sort buttons with price slider in a dedicated bar below stats.
+
+**Unified CSS variables**: all 3 themes (Modern, Classic Steam, Light) use CSS variables (:root), reducing ~300 lines of duplicated CSS to ~100 lines of overrides.
+
+#### 📊 Metrics
+
+| File | v1.4 | v2.0 | Delta |
+|---|---|---|---|
+| `steam-wishlist-sales.sh` | 1175 lines | 959 lines | -216 |
+| `Steam_Wishlist_Sales_Checker.ps1` | 945 lines | 900 lines | -45 |
+
+Code is shorter despite added features because CSS is better factored via CSS variables.
+
+---
+
 ## v1.4 — 28/03/2026
 
 ### 🇫🇷 Français
@@ -31,7 +83,7 @@ Nouveau thème clair : fond #f0f2f5, cartes blanches, accent bleu #1a73e8, vert 
 | Fichier | v1.3 | v1.4 | Delta |
 |---|---|---|---|
 | `steam-wishlist-sales.sh` | 958 lignes | 1175 lignes | +217 |
-| `SteamWishlistSales.ps1` | 741 lignes | 945 lignes | +204 |
+| `Steam_Wishlist_Sales_Checker.ps1` | 741 lignes | 945 lignes | +204 |
 | `run.php` | 48 lignes | 65 lignes | +17 |
 
 ---
@@ -63,7 +115,7 @@ New light theme: #f0f2f5 background, white cards, blue #1a73e8 accent, green #2e
 | File | v1.3 | v1.4 | Delta |
 |---|---|---|---|
 | `steam-wishlist-sales.sh` | 958 lines | 1175 lines | +217 |
-| `SteamWishlistSales.ps1` | 741 lines | 945 lines | +204 |
+| `Steam_Wishlist_Sales_Checker.ps1` | 741 lines | 945 lines | +204 |
 | `run.php` | 48 lines | 65 lines | +17 |
 
 ---
@@ -99,7 +151,7 @@ La description courte de chaque jeu (champ `short_description` de l'API) est ajo
 | Fichier | v1.2 | v1.3 | Delta |
 |---|---|---|---|
 | `steam-wishlist-sales.sh` | 865 lignes | 958 lignes | +93 |
-| `SteamWishlistSales.ps1` | 639 lignes | 741 lignes | +102 |
+| `Steam_Wishlist_Sales_Checker.ps1` | 639 lignes | 741 lignes | +102 |
 
 ---
 
@@ -132,7 +184,7 @@ Each game's short description (from the `short_description` API field) is added 
 | File | v1.2 | v1.3 | Delta |
 |---|---|---|---|
 | `steam-wishlist-sales.sh` | 865 lines | 958 lines | +93 |
-| `SteamWishlistSales.ps1` | 639 lines | 741 lines | +102 |
+| `Steam_Wishlist_Sales_Checker.ps1` | 639 lines | 741 lines | +102 |
 
 ---
 
@@ -165,7 +217,7 @@ Un bouton 🆕 dans la barre de filtres permet d'afficher uniquement les jeux no
 | Fichier | v1.1 | v1.2 | Delta |
 |---|---|---|---|
 | `steam-wishlist-sales.sh` | 751 lignes | 860 lignes | +109 |
-| `SteamWishlistSales.ps1` | 544 lignes | 639 lignes | +95 |
+| `Steam_Wishlist_Sales_Checker.ps1` | 544 lignes | 639 lignes | +95 |
 
 ---
 
@@ -196,7 +248,7 @@ A 🆕 button in the filter bar lets you display only newly discounted games (NE
 | File | v1.1 | v1.2 | Delta |
 |---|---|---|---|
 | `steam-wishlist-sales.sh` | 751 lines | 860 lines | +109 |
-| `SteamWishlistSales.ps1` | 544 lines | 639 lines | +95 |
+| `Steam_Wishlist_Sales_Checker.ps1` | 544 lines | 639 lines | +95 |
 
 ---
 
@@ -227,7 +279,7 @@ Un bouton dans le header permet de basculer entre le thème moderne actuel et un
 | Fichier | v1.0 | v1.1 | Delta |
 |---|---|---|---|
 | `steam-wishlist-sales.sh` | 686 lignes | 751 lignes | +65 |
-| `SteamWishlistSales.ps1` | 352 lignes | 544 lignes | +192 |
+| `Steam_Wishlist_Sales_Checker.ps1` | 352 lignes | 544 lignes | +192 |
 
 ---
 
@@ -256,4 +308,4 @@ A button in the header toggles between the current modern theme and a retro them
 | File | v1.0 | v1.1 | Delta |
 |---|---|---|---|
 | `steam-wishlist-sales.sh` | 686 lines | 751 lines | +65 |
-| `SteamWishlistSales.ps1` | 352 lines | 544 lines | +192 |
+| `Steam_Wishlist_Sales_Checker.ps1` | 352 lines | 544 lines | +192 |

@@ -1,6 +1,6 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════════════════
-# Steam Wishlist Sales — Script d'installation
+# Steam Wishlist Sales Checker — Script d'installation
 # ═══════════════════════════════════════════════════════════════
 #
 # Ce script installe et configure automatiquement le système
@@ -37,7 +37,7 @@ fi
 echo ""
 echo -e "${BOLD}${CYAN}"
 echo "  ╔═══════════════════════════════════════════════╗"
-echo "  ║   🎮  Steam Wishlist Sales — Installation    ║"
+echo "  ║   🎮  Steam Wishlist Sales Checker — Installation    ║"
 echo "  ╚═══════════════════════════════════════════════╝"
 echo -e "${NC}"
 echo ""
@@ -58,7 +58,7 @@ echo ""
 
 # Steam ID
 while true; do
-    read -p "  Steam ID (ex: 76561198040773990) : " STEAM_ID
+    read -p "  Steam ID (ex: 12345678901234567) : " STEAM_ID
     if [[ "$STEAM_ID" =~ ^[0-9]{17}$ ]]; then
         break
     fi
@@ -75,8 +75,8 @@ if ! [[ "$PORT" =~ ^[0-9]+$ ]] || [ "$PORT" -lt 1 ] || [ "$PORT" -gt 65535 ]; th
 fi
 
 # Heures de scan
-read -p "  Heures de scan auto (format cron) [1,7,13,19] : " CRON_HOURS
-CRON_HOURS=${CRON_HOURS:-1,7,13,19}
+read -p "  Heures de scan auto (format cron) [19] : " CRON_HOURS
+CRON_HOURS=${CRON_HOURS:-19}
 
 echo ""
 echo -e "${BOLD}Récapitulatif :${NC}"
@@ -149,7 +149,7 @@ if [ ! -f "$WEB_DIR/index.html" ]; then
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Steam Wishlist Sales — Installation</title>
+<title>Steam Wishlist Sales Checker — Installation</title>
 <style>
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
   body { background: #0a0e14; color: #c6d4df; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
@@ -164,7 +164,7 @@ if [ ! -f "$WEB_DIR/index.html" ]; then
 <body>
 <div class="box">
   <div class="icon">🎮</div>
-  <h1>Steam Wishlist Sales</h1>
+  <h1>Steam Wishlist Sales Checker</h1>
   <p>L'installation est terminée !<br>Lancez le premier scan pour générer la page des promotions.</p>
   <a class="btn" href="run.php">▶ Lancer le premier scan</a>
 </div>

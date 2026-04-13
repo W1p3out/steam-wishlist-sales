@@ -33,7 +33,7 @@ LOCK_FILE="/tmp/steam-wishlist-sales.lock"
 BATCH_SIZE=30
 DELAY_SECONDS=2
 COUNTRY_CODE="fr"
-SCAN_HOURS="1,7,13,19"
+SCAN_HOURS="19"
 
 # ── Couleurs pour le log ──────────────────────────────────────
 RED='\033[0;31m'
@@ -346,14 +346,14 @@ if [ -f "$ENDOFSALES_FLAG" ] && [ "$SALE_COUNT" -gt 0 ]; then
     echo "{" > "$DATES_TMP"
 
     APPIDS=$(jq -r '.[].appid' "$SALES_FILE")
-    TOTAL=$(echo "$APPIDS" | wc -w)
+    EOS_TOTAL=$(echo "$APPIDS" | wc -w)
     COUNT=0
     FOUND=0
     FIRST=true
 
     for APPID in $APPIDS; do
         COUNT=$((COUNT + 1))
-        printf "\r  [%d/%d] App %s..." "$COUNT" "$TOTAL" "$APPID" >&2
+        printf "\r  [%d/%d] App %s..." "$COUNT" "$EOS_TOTAL" "$APPID" >&2
 
         PAGE=$(curl -sL --max-time 15 \
             -H "Cookie: birthtime=0; wants_mature_content=1" \
@@ -395,7 +395,7 @@ if [ -f "$ENDOFSALES_FLAG" ] && [ "$SALE_COUNT" -gt 0 ]; then
     chmod 644 "$SALE_DATES_FILE"
     chown www-data:www-data "$SALE_DATES_FILE" 2>/dev/null
     echo ""
-    ok "Dates de fin récupérées : ${FOUND}/${TOTAL} jeux"
+    ok "Dates de fin récupérées : ${FOUND}/${EOS_TOTAL} jeux"
 else
     if [ ! -f "$ENDOFSALES_FLAG" ]; then
         rm -f "$SALE_DATES_FILE" 2>/dev/null
@@ -408,7 +408,7 @@ fi
 ELAPSED=$(( $(date +%s) - START_TIME ))
 BEST_DISCOUNT=$(jq '[.[].discount_pct] | if length > 0 then max else 0 end' "$SALES_FILE" 2>/dev/null || echo "0")
 CHEAPEST=$(jq '[.[].sale_price] | if length > 0 then min else 0 end' "$SALES_FILE" 2>/dev/null || echo "0")
-CHEAPEST_FMT=$(echo "scale=2; ${CHEAPEST:-0} / 100" | bc 2>/dev/null | sed 's/\./,/' || echo "0,00")
+CHEAPEST_FMT=$(echo "scale=2; ${CHEAPEST:-0} / 100" | bc 2>/dev/null | sed 's/^\./0./;s/\./,/' || echo "0,00")
 MAX_PRICE=$(jq '[.[].sale_price] | if length > 0 then max else 0 end' "$SALES_FILE" 2>/dev/null || echo "0")
 MAX_PRICE_EUR=$(echo "scale=0; (${MAX_PRICE:-0} + 99) / 100" | bc 2>/dev/null || echo "0")
 NOW=$(date '+%d/%m/%Y à %H:%M')
@@ -419,7 +419,8 @@ ALL_GENRES=$(jq -r '[.[].genres[]?] | unique | .[]' "$SALES_FILE" 2>/dev/null | 
 GENRE_BUTTONS=""
 while IFS= read -r genre; do
     if [ -n "$genre" ]; then
-        GENRE_BUTTONS="${GENRE_BUTTONS}<button class=\"genre-btn\" data-genre=\"${genre}\">${genre}</button>"
+        GCOUNT=$(jq -r --arg g "$genre" '[.[] | select(.genres[]? == $g)] | length' "$SALES_FILE" 2>/dev/null)
+        GENRE_BUTTONS="${GENRE_BUTTONS}<button class=\"sidebar-btn\" data-genre=\"${genre}\"><span>${genre}</span><span class=\"count\">${GCOUNT}</span></button>"
     fi
 done <<< "$ALL_GENRES"
 
@@ -429,7 +430,8 @@ ALL_CATS=$(jq -r '[.[].cats[]?] | unique | .[]' "$SALES_FILE" 2>/dev/null | grep
 CAT_BUTTONS=""
 while IFS= read -r cat; do
     if [ -n "$cat" ]; then
-        CAT_BUTTONS="${CAT_BUTTONS}<button class=\"cat-btn\" data-cat=\"${cat}\">${cat}</button>"
+        CCOUNT=$(jq -r --arg c "$cat" '[.[] | select(.cats[]? == $c)] | length' "$SALES_FILE" 2>/dev/null)
+        CAT_BUTTONS="${CAT_BUTTONS}<button class=\"sidebar-btn\" data-cat=\"${cat}\"><span>${cat}</span><span class=\"count\">${CCOUNT}</span></button>"
     fi
 done <<< "$ALL_CATS"
 
@@ -441,6 +443,8 @@ CARDS_HTML=$(jq -r '
    elif .badge == "price_down" then "<span class=\"status-badge down-badge\">Prix &#128317;</span>"
    else "" end) as $status_html |
   (if .metacritic then "<span class=\"metacritic " + (if .metacritic >= 75 then "mc-high" elif .metacritic >= 50 then "mc-mid" else "mc-low" end) + "\">" + (.metacritic | tostring) + "</span>" else "" end) as $mc_html |
+  (.normal_price / 100 | tostring | split(".") | if length == 2 then .[0] + "," + (.[1] + "00")[:2] else .[0] + ",00" end) as $old_price |
+  (.sale_price / 100 | tostring | split(".") | if length == 2 then .[0] + "," + (.[1] + "00")[:2] else .[0] + ",00" end) as $new_price |
   "<a class=\"card\" data-name=\"\(.name | gsub("\""; "&quot;"))\" data-sale=\"\(.sale_price)\" data-disc=\"\(.discount_pct)\" data-genres=\"\([.genres[]?] | join(","))\" data-cats=\"\([.cats[]?] | join(","))\" data-badge=\"\(.badge // "")\" data-mc=\"\(.metacritic // 0)\" title=\"\(.desc | gsub("\""; "&quot;") | gsub("<[^>]*>"; ""))\" href=\"https://store.steampowered.com/app/\(.appid)\" target=\"_blank\" rel=\"noopener\">"
   + "<div class=\"img-wrap\">"
   + "<img src=\"\(.capsule)\" alt=\"\(.name | gsub("\""; "&quot;"))\" loading=\"lazy\" />"
@@ -451,8 +455,8 @@ CARDS_HTML=$(jq -r '
   + "<div class=\"name\">\(.name | gsub("<"; "&lt;") | gsub(">"; "&gt;"))</div>"
   + "<div class=\"genres-row\">\([.genres[]?] | map("<span class=\"genre-tag\">" + (. | gsub("<"; "&lt;") | gsub(">"; "&gt;")) + "</span>") | join(""))</div>"
   + "<div class=\"prices\">"
-  + "<span class=\"old\">\(.normal_price / 100 | tostring | gsub("\\."; ",") | if test(",") then . else . + ",00" end)\u20ac</span>"
-  + "<span class=\"new\">\(.sale_price / 100 | tostring | gsub("\\."; ",") | if test(",") then . else . + ",00" end)\u20ac</span>"
+  + "<span class=\"old\">\($old_price)\u20ac</span>"
+  + "<span class=\"new\">\($new_price)\u20ac</span>"
   + $mc_html
   + "</div>"
   + "</div></a>"
@@ -466,455 +470,290 @@ cat > "$OUTPUT_FILE" << 'HTMLHEAD'
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#x1F3AE;</text></svg>">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Steam Wishlist — Promotions</title>
+<title>Steam Wishlist Sales Checker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;800&family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;700;800&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-
-    /* ════════════════════════════════════════════════════
-       THÈME MODERN (défaut)
-       ════════════════════════════════════════════════════ */
-    body {
-        background: #0a0e14;
-        color: #c6d4df;
-        font-family: 'Outfit', sans-serif;
-        min-height: 100vh;
-        position: relative;
-        overflow-x: hidden;
+    :root {
+        --bg-deep: #070a0f; --bg-card: #111822; --bg-sidebar: #0a0f17;
+        --border: rgba(102,192,244,0.08); --border-hover: rgba(102,192,244,0.2);
+        --accent: #66c0f4; --accent-glow: rgba(102,192,244,0.12);
+        --green: #a4d007; --orange: #f39c12; --red: #e05a4f;
+        --text: #c6d4df; --text-dim: #5a6a78; --text-muted: #3e4f5e;
+        --font-h: 'Exo 2', sans-serif; --font-b: 'Outfit', sans-serif;
     }
-    body::before {
-        content: '';
-        position: fixed;
-        top: 0; left: 0; right: 0; bottom: 0;
-        background:
-            radial-gradient(ellipse 80% 50% at 20% 10%, rgba(102, 192, 244, 0.04) 0%, transparent 60%),
-            radial-gradient(ellipse 60% 40% at 80% 90%, rgba(164, 208, 7, 0.03) 0%, transparent 60%);
-        pointer-events: none;
-        z-index: 0;
-    }
-    .container { max-width: 1500px; margin: 0 auto; padding: 28px 24px; position: relative; z-index: 1; }
-
-    .header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; padding-bottom: 18px; border-bottom: 1px solid rgba(102, 192, 244, 0.1); }
-    .header h1 { font-family: 'Exo 2', sans-serif; font-size: 1.8rem; font-weight: 800; color: #fff; letter-spacing: -0.02em; display: flex; align-items: center; gap: 12px; }
-    .header h1 .icon { font-size: 1.5rem; filter: drop-shadow(0 0 8px rgba(102, 192, 244, 0.5)); }
-    .header-right { display: flex; align-items: center; gap: 14px; font-size: 0.82rem; color: #5a6a78; flex-wrap: wrap; }
-    .header-right .count { color: #66c0f4; font-weight: 600; font-size: 0.95rem; }
-
-    .gear-wrap { position: relative; display: inline-block; }
-    .gear-btn { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; background: rgba(102, 192, 244, 0.08); border: 1px solid rgba(102, 192, 244, 0.2); border-radius: 10px; color: #8f98a0; font-size: 1.1rem; cursor: pointer; transition: all 0.25s; }
-    .gear-btn:hover { border-color: #66c0f4; color: #fff; transform: rotate(45deg); }
-    .gear-dropdown { display: none; position: absolute; top: 42px; right: 0; background: #0c1018; border: 1px solid rgba(102, 192, 244, 0.2); border-radius: 10px; padding: 6px 0; min-width: 220px; box-shadow: 0 10px 35px rgba(0,0,0,0.5); z-index: 100; }
+    body { background: var(--bg-deep); color: var(--text); font-family: var(--font-b); min-height: 100vh; display: flex; overflow-x: hidden; }
+    ::-webkit-scrollbar { width: 5px; } ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(102,192,244,0.12); border-radius: 3px; }
+    .sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: 260px; background: var(--bg-sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 10; overflow-y: auto; transition: background 0.3s, transform 0.3s ease; }
+    .sidebar.open { transform: translateX(0); }
+    .sidebar-logo { padding: 16px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+    .sidebar-logo .icon { font-size: 1.3rem; }
+    .sidebar-logo h1 { font-family: var(--font-h); font-size: 0.88rem; font-weight: 700; color: #fff; letter-spacing: 0.02em; text-transform: uppercase; }
+    .sidebar-logo .version { font-size: 0.58rem; color: var(--accent); background: var(--accent-glow); padding: 2px 6px; border-radius: 8px; font-weight: 600; }
+    .sidebar-section { padding: 10px 8px 4px; }
+    .sidebar-section-title { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 5px; padding-left: 6px; }
+    .sidebar-btn { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 8px; border: none; background: transparent; color: var(--text-dim); font-size: 0.88rem; font-family: var(--font-b); cursor: pointer; border-radius: 6px; transition: all 0.2s; margin-bottom: 1px; text-align: left; }
+    .sidebar-btn:hover { background: rgba(255,255,255,0.03); color: var(--text); }
+    .sidebar-btn.active { background: linear-gradient(135deg, rgba(102,192,244,0.12), rgba(102,192,244,0.06)); color: var(--accent); font-weight: 600; }
+    .sidebar-btn .count { margin-left: auto; font-size: 0.62rem; color: var(--text-muted); background: rgba(255,255,255,0.04); padding: 1px 5px; border-radius: 8px; }
+    .sidebar-divider { height: 1px; background: var(--border); margin: 4px 8px; }
+    .sidebar-meta { margin-top: auto; padding: 10px 12px; border-top: 1px solid var(--border); font-size: 0.68rem; color: var(--text-muted); line-height: 1.5; }
+    .sidebar-meta strong { color: var(--accent); }
+    .new-only-btn.active { background: linear-gradient(135deg, rgba(102,192,244,0.14), rgba(102,192,244,0.06)); color: var(--accent); font-weight: 600; }
+    .expiring-btn.active { background: linear-gradient(135deg, rgba(224,90,79,0.14), rgba(224,90,79,0.06)); color: var(--red); font-weight: 600; }
+    .cat-active { background: linear-gradient(135deg, rgba(164,208,7,0.12), rgba(164,208,7,0.06)); color: var(--green); font-weight: 600; }
+    .main { margin-left: 260px; flex: 1; padding: 18px 22px; position: relative; z-index: 1; }
+    .topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .search-box { flex: 1; max-width: 400px; position: relative; }
+    .search-box input { width: 100%; padding: 8px 14px 8px 36px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: var(--font-b); font-size: 0.9rem; outline: none; transition: border-color 0.2s; }
+    .search-box input:focus { border-color: var(--accent); }
+    .search-box input::placeholder { color: var(--text-muted); }
+    .search-box::before { content: '\01F50D'; position: absolute; left: 11px; top: 50%; transform: translateY(-50%); font-size: 0.74rem; opacity: 0.3; }
+    .topbar-right { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+    .count-topbar { font-size: 0.95rem; font-weight: 600; color: var(--green); font-family: var(--font-h); }
+    .gear-wrap { position: relative; }
+    .gear-btn { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; color: var(--text-dim); font-size: 1.15rem; cursor: pointer; transition: all 0.25s; }
+    .gear-btn:hover { border-color: var(--border-hover); color: var(--text); transform: rotate(45deg); }
+    .gear-dropdown { display: none; position: absolute; top: 42px; right: 0; background: #0c1018; border: 1px solid var(--border-hover); border-radius: 8px; padding: 6px 0; min-width: 260px; box-shadow: 0 10px 35px rgba(0,0,0,0.5); z-index: 100; }
     .gear-wrap.open .gear-dropdown { display: block; }
-    .gear-item { display: flex; align-items: center; gap: 10px; padding: 8px 16px; color: #8f98a0; font-size: 0.78rem; cursor: pointer; transition: all 0.15s; border: none; background: none; width: 100%; font-family: 'Outfit', sans-serif; text-decoration: none; text-align: left; }
-    .gear-item:hover { background: rgba(255,255,255,0.04); color: #fff; }
+    .gear-item { display: flex; align-items: center; gap: 10px; padding: 8px 14px; color: var(--text-dim); font-size: 0.84rem; cursor: pointer; transition: all 0.15s; border: none; background: none; width: 100%; font-family: var(--font-b); text-decoration: none; text-align: left; }
+    .gear-item:hover { background: rgba(255,255,255,0.04); color: var(--text); }
     .gear-item .g-ico { width: 18px; text-align: center; }
-    .gear-item.active-theme { color: #66c0f4; font-weight: 600; }
+    .gear-item.active-theme { color: var(--accent); font-weight: 600; }
     .gear-item.active-theme::after { content: '\2713'; margin-left: auto; font-size: 0.7rem; }
-    .gear-sep { height: 1px; background: rgba(102, 192, 244, 0.08); margin: 4px 12px; }
-    .gear-danger { color: #e05a4f; }
-    .gear-danger:hover { background: rgba(224, 90, 79, 0.08); }
-
-    .stats { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 18px; padding: 14px 18px; background: rgba(255,255,255,0.02); border: 1px solid rgba(102, 192, 244, 0.08); border-radius: 10px; font-size: 0.82rem; }
-    .stats span { color: #8f98a0; }
-    .stats .val { color: #66c0f4; font-weight: 600; }
-    .stats .val-green { color: #a4d007; font-weight: 600; }
-
-    .controls { display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
-    .search-box { flex: 1; min-width: 200px; max-width: 380px; }
-    .search-box input { width: 100%; padding: 9px 18px; border-radius: 24px; border: 1px solid rgba(102, 192, 244, 0.18); background: rgba(0,0,0,0.35); color: #c6d4df; font-size: 0.88rem; font-family: 'Outfit', sans-serif; outline: none; transition: border-color 0.25s, box-shadow 0.25s; }
-    .search-box input:focus { border-color: #66c0f4; box-shadow: 0 0 12px rgba(102, 192, 244, 0.15); }
-    .search-box input::placeholder { color: #3e4f5e; }
-
-    .toolbar { display: flex; gap: 6px; flex-wrap: wrap; }
-    .toolbar button { background: rgba(102, 192, 244, 0.06); border: 1px solid rgba(102, 192, 244, 0.14); color: #8f98a0; padding: 7px 18px; border-radius: 24px; font-size: 0.82rem; cursor: pointer; transition: all 0.2s; font-family: 'Outfit', sans-serif; }
-    .toolbar button:hover { background: rgba(102, 192, 244, 0.14); color: #fff; }
-    .toolbar button.active { background: linear-gradient(135deg, #66c0f4, #4a9fd4); color: #fff; border-color: transparent; font-weight: 600; box-shadow: 0 2px 12px rgba(102, 192, 244, 0.25); }
-
-    .genre-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; }
-    .genre-btn { background: rgba(164, 208, 7, 0.06); border: 1px solid rgba(164, 208, 7, 0.12); color: #6a7a58; padding: 5px 14px; border-radius: 20px; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; font-family: 'Outfit', sans-serif; }
-    .genre-btn:hover { background: rgba(164, 208, 7, 0.14); color: #a4d007; }
-    .genre-btn.active { background: linear-gradient(135deg, #a4d007, #7aa800); color: #fff; border-color: transparent; font-weight: 600; }
-    .new-only-btn.active { background: linear-gradient(135deg, #66c0f4, #4a9fd4); }
-    .expiring-btn.active { background: linear-gradient(135deg, #e05a4f, #c0392b); }
-
-    .cat-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
-    .cat-btn { background: rgba(164, 208, 7, 0.06); border: 1px solid rgba(164, 208, 7, 0.14); color: #8f98a0; padding: 5px 14px; border-radius: 18px; font-size: 0.72rem; cursor: pointer; transition: all 0.2s; font-family: 'Outfit', sans-serif; }
-    .cat-btn:hover { background: rgba(164, 208, 7, 0.14); color: #fff; }
-    .cat-btn.active { background: linear-gradient(135deg, #a4d007, #7aa800); color: #fff; border-color: transparent; font-weight: 600; }
-
-    .cat-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
-    .cat-btn { background: rgba(164, 208, 7, 0.06); border: 1px solid rgba(164, 208, 7, 0.14); color: #8f98a0; padding: 5px 12px; border-radius: 16px; font-size: 0.72rem; cursor: pointer; transition: all 0.2s; font-family: 'Outfit', sans-serif; }
-    .cat-btn:hover { background: rgba(164, 208, 7, 0.14); color: #fff; }
-    .cat-btn.active { background: linear-gradient(135deg, #a4d007, #7aa800); color: #fff; border-color: transparent; font-weight: 600; }
-
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
-
-    .card { background: linear-gradient(160deg, #141c27 0%, #0f1923 100%); border-radius: 10px; overflow: hidden; text-decoration: none; color: inherit; transition: transform 0.25s ease, box-shadow 0.25s ease; display: flex; flex-direction: column; border: 1px solid rgba(102, 192, 244, 0.05); opacity: 0; animation: fadeSlideUp 0.4s ease forwards; }
-    .card:hover { transform: translateY(-5px) scale(1.01); box-shadow: 0 12px 35px rgba(0, 0, 0, 0.5), 0 0 20px rgba(102, 192, 244, 0.06); }
-
-    .img-wrap { position: relative; aspect-ratio: 460 / 215; overflow: hidden; background: #080c12; }
-    .img-wrap img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s ease; }
-    .card:hover .img-wrap img { transform: scale(1.07); }
-
-    .badge { position: absolute; top: 0; right: 0; color: #fff; font-family: 'Exo 2', sans-serif; font-weight: 800; font-size: 0.92rem; padding: 5px 12px 5px 14px; border-radius: 0 0 0 10px; letter-spacing: -0.03em; text-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+    .gear-sep { height: 1px; background: var(--border); margin: 4px 12px; }
+    .gear-danger { color: var(--red); }
+    .gear-danger:hover { background: rgba(224,90,79,0.06); }
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px; }
+    .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; transition: border-color 0.2s; }
+    .stat-card:hover { border-color: var(--border-hover); }
+    .stat-label { font-size: 0.64rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 2px; }
+    .stat-value { font-family: var(--font-h); font-size: 1.35rem; font-weight: 700; color: #fff; white-space: nowrap; }
+    .stat-value.accent { color: var(--accent); }
+    .stat-value.green { color: var(--green); }
+    .toolbar-row { display: flex; align-items: center; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+    .toolbar-row .label { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; margin-right: 2px; }
+    .sort-btn { padding: 5px 12px; background: transparent; border: 1px solid var(--border); color: var(--text-dim); border-radius: 14px; font-size: 0.8rem; font-family: var(--font-b); cursor: pointer; transition: all 0.2s; }
+    .sort-btn:hover { border-color: var(--border-hover); color: var(--text); }
+    .sort-btn.active { background: var(--accent); color: #fff; border-color: transparent; font-weight: 600; }
+    .price-slider { display: flex; align-items: center; gap: 8px; margin-left: 10px; padding-left: 10px; border-left: 1px solid var(--border); flex: 1; max-width: 320px; }
+    .price-slider label { font-size: 0.74rem; color: var(--text-muted); white-space: nowrap; }
+    .price-slider input[type=range] { -webkit-appearance: none; appearance: none; flex: 1; min-width: 120px; height: 4px; background: rgba(102,192,244,0.12); border-radius: 2px; outline: none; }
+    .price-slider input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--bg-deep); }
+    .price-slider input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--bg-deep); }
+    .price-val { font-size: 0.88rem; color: var(--accent); font-weight: 600; font-family: var(--font-h); min-width: 40px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+    .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; text-decoration: none; color: inherit; display: flex; flex-direction: column; transition: all 0.3s; opacity: 0; animation: fadeUp 0.4s ease forwards; }
+    .card:hover { border-color: var(--border-hover); transform: translateY(-3px); box-shadow: 0 8px 28px rgba(0,0,0,0.35); }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+    .img-wrap { position: relative; aspect-ratio: 460/215; overflow: hidden; background: #080c12; }
+    .img-wrap img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s; }
+    .card:hover .img-wrap img { transform: scale(1.06); }
+    .badge { position: absolute; top: 0; right: 0; color: #fff; font-family: var(--font-h); font-weight: 800; font-size: 0.95rem; padding: 5px 12px 5px 14px; border-radius: 0 0 0 8px; text-shadow: 0 1px 3px rgba(0,0,0,0.3); }
     .badge-high { background: linear-gradient(135deg, #a4d007, #7aa800); }
     .badge-mid { background: linear-gradient(135deg, #f39c12, #d68910); }
     .badge-low { background: linear-gradient(135deg, #e05a4f, #c0392b); }
-
-    .status-badge { position: absolute; top: 0; left: 0; color: #fff; font-family: 'Exo 2', sans-serif; font-weight: 700; font-size: 0.72rem; padding: 4px 10px 4px 8px; border-radius: 0 0 10px 0; text-shadow: 0 1px 2px rgba(0,0,0,0.4); z-index: 2; letter-spacing: 0.02em; }
+    .status-badge { position: absolute; top: 0; left: 0; color: #fff; font-family: var(--font-h); font-weight: 700; font-size: 0.76rem; padding: 4px 10px 4px 8px; border-radius: 0 0 8px 0; text-shadow: 0 1px 2px rgba(0,0,0,0.4); z-index: 2; }
     .new-badge { background: linear-gradient(135deg, #66c0f4, #4a9fd4); }
     .up-badge { background: linear-gradient(135deg, #e05a4f, #c0392b); }
     .down-badge { background: linear-gradient(135deg, #27ae60, #1e8449); }
+    .info { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
+    .name { font-size: 0.96rem; font-weight: 600; color: #fff; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .genres-row { display: flex; gap: 4px; flex-wrap: wrap; }
+    .genre-tag { font-size: 0.6rem; padding: 2px 6px; border-radius: 3px; background: rgba(255,255,255,0.04); color: var(--text-dim); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+    .prices { display: flex; align-items: center; gap: 8px; margin-top: auto; }
+    .old { font-size: 0.8rem; color: var(--text-muted); text-decoration: line-through; }
+    .new { font-family: var(--font-h); font-size: 1.15rem; font-weight: 800; color: var(--green); }
+    .metacritic { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 18px; font-family: var(--font-h); font-weight: 700; font-size: 0.72rem; border-radius: 4px; color: #fff; padding: 0 4px; margin-left: auto; }
+    .mc-high { background: #66cc33; } .mc-mid { background: #ffcc33; color: #111; } .mc-low { background: #ff4444; }
+    .end-date { display: block; font-size: 0.74rem; color: #8f98a0; margin-top: 2px; }
+    .end-date-urgent { color: var(--red); font-weight: 600; }
 
-    .info { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 5px; flex: 1; }
-    .name { font-size: 0.92rem; font-weight: 600; color: #fff; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .genres-row { display: flex; gap: 4px; flex-wrap: wrap; min-height: 18px; }
-    .genre-tag { font-size: 0.62rem; color: #6a7a88; background: rgba(255,255,255,0.04); padding: 1px 7px; border-radius: 8px; white-space: nowrap; }
-    .prices { display: flex; align-items: center; gap: 10px; margin-top: auto; }
-    .old { font-size: 0.8rem; color: #6a7a88; text-decoration: line-through; }
-    .new { font-family: 'Exo 2', sans-serif; font-size: 1.08rem; font-weight: 800; color: #a4d007; text-shadow: 0 0 10px rgba(164, 208, 7, 0.15); }
 
-    .metacritic { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 22px; font-family: 'Exo 2', sans-serif; font-weight: 800; font-size: 0.68rem; border-radius: 4px; color: #fff; margin-left: auto; padding: 0 5px; }
-    .mc-high { background: #66cc33; }
-    .mc-mid { background: #ffcc33; color: #111; }
-    .mc-low { background: #ff4444; }
 
-    .price-filter { display: flex; align-items: center; gap: 8px; margin-left: 8px; padding-left: 8px; border-left: 1px solid rgba(102,192,244,0.12); }
-    .price-filter label { font-size: 0.75rem; color: #8f98a0; font-family: 'Outfit', sans-serif; white-space: nowrap; }
-    .price-filter input[type=range] { -webkit-appearance: none; appearance: none; width: 100px; height: 4px; background: rgba(102, 192, 244, 0.15); border-radius: 2px; outline: none; }
-    .price-filter input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #66c0f4; cursor: pointer; border: 2px solid #0a0e14; }
-    .price-filter input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #66c0f4; cursor: pointer; border: 2px solid #0a0e14; }
-    .price-val { font-size: 0.78rem; color: #66c0f4; font-weight: 600; font-family: 'Exo 2', sans-serif; min-width: 40px; }
-
-    .end-date { display: block; font-size: 0.68rem; color: #8f98a0; margin-top: 3px; font-family: 'Outfit', sans-serif; }
-    .end-date-urgent { color: #e05a4f; font-weight: 600; }
-
-    .empty { text-align: center; padding: 80px 20px; color: #3e4f5e; font-size: 1.1rem; }
-
-    @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
-
-    @media (max-width: 640px) {
-        .container { padding: 14px 10px; }
-        .header h1 { font-size: 1.3rem; }
-        .grid { grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 8px; }
-        .info { padding: 8px 10px 10px; }
-        .name { font-size: 0.82rem; }
-        .badge { font-size: 0.8rem; padding: 3px 9px 3px 11px; }
-        .status-badge { font-size: 0.62rem; padding: 3px 7px 3px 5px; }
-        .stats { gap: 12px; font-size: 0.75rem; }
-    }
-
-    /* ════════════════════════════════════════════════════
-       THÈME CLASSIC STEAM (2004-2010)
-       Vert olive, Tahoma, bordures biseautées
-       ════════════════════════════════════════════════════ */
-    body.classic {
-        background: #3b4a36;
-        color: #d2d2d2;
-        font-family: Tahoma, Verdana, Arial, sans-serif;
-    }
-    body.classic::before {
-        background: linear-gradient(180deg, #4a5a42 0%, #3b4a36 40%, #2d3a28 100%);
-    }
-
-    body.classic .container { max-width: 1200px; padding: 12px 16px; }
-
-    body.classic .header {
-        background: linear-gradient(180deg, #5c7a49 0%, #4a6637 100%);
-        border: 1px solid #6b8a56;
-        border-bottom: 2px solid #2d3a28;
-        border-radius: 0;
-        padding: 8px 14px;
-        margin-bottom: 10px;
-    }
-    body.classic .header h1 {
-        font-family: Tahoma, Verdana, sans-serif;
-        font-size: 1.15rem;
-        font-weight: bold;
-        color: #d2e8b0;
-        letter-spacing: 0;
-        text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
-    }
-    body.classic .header h1 .icon { font-size: 1rem; filter: none; }
-    body.classic .header-right { font-size: 0.72rem; color: #a0b890; }
-    body.classic .header-right .count { color: #d2e8b0; font-size: 0.78rem; }
-
-    body.classic .gear-btn { background: linear-gradient(180deg, #6b8a56 0%, #4a6637 100%); border: 1px solid #7a9a64; border-bottom: 1px solid #3a5228; border-radius: 3px; color: #d2e8b0; }
-    body.classic .gear-btn:hover { background: linear-gradient(180deg, #7a9a64 0%, #5a7a47 100%); color: #fff; transform: rotate(45deg); }
-    body.classic .gear-dropdown { background: #1a2612; border: 1px solid #4a5a40; border-radius: 3px; }
-    body.classic .gear-item { font-family: Tahoma, sans-serif; font-size: 0.72rem; color: #8a9a80; }
-    body.classic .gear-item:hover { background: rgba(255,255,255,0.04); color: #d2e8b0; }
-    body.classic .gear-item.active-theme { color: #a4d007; }
-    body.classic .gear-sep { background: rgba(138,154,128,0.15); }
-    body.classic .gear-danger { color: #b03a2e; }
-    body.classic .gear-danger:hover { background: rgba(176,58,46,0.08); }
-
-    body.classic .stats {
-        background: linear-gradient(180deg, #4a5a42 0%, #3e4e38 100%);
-        border: 1px solid #5a6a52;
-        border-radius: 0;
-        padding: 8px 12px;
-        font-size: 0.72rem;
-    }
-    body.classic .stats span { color: #a0b890; }
-    body.classic .stats .val { color: #d2e8b0; }
-    body.classic .stats .val-green { color: #a4d007; }
-
-    body.classic .search-box input {
-        border-radius: 2px;
-        border: 1px solid #5a6a52;
-        background: #2d3a28;
-        color: #d2d2d2;
-        font-family: Tahoma, sans-serif;
-        font-size: 0.78rem;
-        padding: 5px 10px;
-    }
-    body.classic .search-box input:focus { border-color: #7a9a64; box-shadow: none; }
-    body.classic .search-box input::placeholder { color: #6a7a62; }
-
-    body.classic .toolbar button {
-        background: linear-gradient(180deg, #5c7a49 0%, #4a6637 100%);
-        border: 1px solid #6b8a56;
-        border-bottom: 1px solid #3a5228;
-        color: #a0b890;
-        border-radius: 2px;
-        padding: 4px 12px;
-        font-family: Tahoma, sans-serif;
-        font-size: 0.72rem;
-    }
-    body.classic .toolbar button:hover { color: #d2e8b0; }
-    body.classic .toolbar button.active {
-        background: linear-gradient(180deg, #7a9a64 0%, #5a7a47 100%);
-        color: #fff;
-        border-color: #8aaa74;
-        box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
-    }
-
-    body.classic .genre-btn {
-        background: linear-gradient(180deg, #4a5a42 0%, #3e4e38 100%);
-        border: 1px solid #5a6a52;
-        color: #8a9a80;
-        border-radius: 2px;
-        padding: 3px 10px;
-        font-family: Tahoma, sans-serif;
-        font-size: 0.68rem;
-    }
-    body.classic .genre-btn:hover { color: #d2e8b0; }
-    body.classic .genre-btn.active {
-        background: linear-gradient(180deg, #7a9a64 0%, #5a7a47 100%);
-        color: #fff;
-        border-color: #8aaa74;
-    }
-    body.classic .new-only-btn.active { background: linear-gradient(180deg, #4a8ab5 0%, #3a6a95 100%); border-color: #5a9ac5; }
-    body.classic .expiring-btn.active { background: linear-gradient(180deg, #b03a2e 0%, #8a2a1e 100%); border-color: #c04a3e; }
-
-    body.classic .cat-filters { gap: 4px; margin-bottom: 10px; }
-    body.classic .cat-btn { background: linear-gradient(180deg, #3a4a30 0%, #2a3a20 100%); border: 1px solid #4a5a40; color: #8a9a80; border-radius: 3px; font-family: Tahoma, sans-serif; font-size: 0.68rem; padding: 3px 10px; }
-    body.classic .cat-btn:hover { color: #d2e8b0; }
-    body.classic .cat-btn.active { background: linear-gradient(180deg, #7a9a64 0%, #5a7a47 100%); color: #fff; border-color: #8aaa74; }
-
-    body.classic .cat-filters { margin-bottom: 10px; }
-    body.classic .cat-btn { background: linear-gradient(180deg, #4a5a3e 0%, #3a4a2e 100%); border: 1px solid #5a6a4e; border-bottom: 1px solid #2a3a1e; color: #8a9a80; border-radius: 3px; padding: 3px 10px; font-family: Tahoma, sans-serif; font-size: 0.68rem; }
-    body.classic .cat-btn:hover { color: #d2e8b0; }
-    body.classic .cat-btn.active { background: linear-gradient(180deg, #7a9a64 0%, #5a7a47 100%); color: #fff; border-color: #8aaa74; }
-
-    body.classic .grid { gap: 8px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
-
-    body.classic .card {
-        background: linear-gradient(180deg, #4a5a42 0%, #3e4e38 100%);
-        border: 1px solid #5a6a52;
-        border-radius: 0;
-        animation: none;
-        opacity: 1;
-    }
-    body.classic .card:hover {
-        transform: none;
-        box-shadow: 0 0 0 1px #8aaa74;
-        border-color: #8aaa74;
-    }
+    .mob-gear { position: relative; margin-left: auto; }
+    .sidebar-close { display: none; position: absolute; top: 12px; right: 12px; background: none; border: none; color: var(--text-dim); font-size: 1.3rem; cursor: pointer; z-index: 2; padding: 4px 8px; }
+    .sidebar-close:hover { color: var(--text); }
+    .mobile-bar { display: none; }
+    .empty { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 1.1rem; }
+    body.classic { --bg-deep: #1e2a16; --bg-card: #2a3a20; --bg-sidebar: #1a2612; --border: rgba(138,154,128,0.15); --border-hover: rgba(138,154,128,0.35); --accent: #8aaa74; --accent-glow: rgba(138,154,128,0.12); --green: #a4d007; --orange: #b8860b; --red: #b03a2e; --text: #d2e8b0; --text-dim: #8a9a80; --text-muted: #5a6a50; --font-h: Tahoma, sans-serif; --font-b: Tahoma, sans-serif; }
+    body.classic .card { border-radius: 2px; } body.classic .card:hover { transform: none; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
     body.classic .card:hover .img-wrap img { transform: none; }
-
-    body.classic .img-wrap { background: #2d3a28; }
-
-    body.classic .badge {
-        border-radius: 0;
-        font-family: Tahoma, sans-serif;
-        font-size: 0.82rem;
-        font-weight: bold;
-        padding: 2px 8px;
-    }
-    body.classic .badge-high { background: #4a7a20; }
-    body.classic .badge-mid { background: #b8860b; }
-    body.classic .badge-low { background: #b03a2e; }
-
-    body.classic .status-badge { border-radius: 0; font-family: Tahoma, sans-serif; font-size: 0.68rem; font-weight: bold; padding: 2px 6px; }
-    body.classic .new-badge { background: #4a8ab5; }
-    body.classic .up-badge { background: #b03a2e; }
-    body.classic .down-badge { background: #1e8449; }
-
-    body.classic .info { padding: 8px 10px 10px; gap: 4px; }
-    body.classic .name { font-size: 0.8rem; font-weight: bold; font-family: Tahoma, sans-serif; color: #d2e8b0; }
-    body.classic .genre-tag { font-size: 0.58rem; color: #8a9a80; background: rgba(0,0,0,0.2); border-radius: 2px; padding: 1px 5px; }
-    body.classic .old { font-size: 0.72rem; color: #8a9a80; }
-    body.classic .new { font-family: Tahoma, sans-serif; font-size: 0.88rem; font-weight: bold; color: #a4d007; text-shadow: none; }
-
-    body.classic .metacritic { border-radius: 2px; font-family: Tahoma, sans-serif; font-size: 0.62rem; }
-
-    body.classic .price-filter { border-left-color: rgba(138,154,128,0.2); }
-    body.classic .price-filter label { font-family: Tahoma, sans-serif; font-size: 0.68rem; color: #8a9a80; }
-    body.classic .price-filter input[type=range] { background: rgba(138,154,128,0.2); }
-    body.classic .price-filter input[type=range]::-webkit-slider-thumb { background: #7a9a64; border-color: #1e2a16; }
-    body.classic .price-filter input[type=range]::-moz-range-thumb { background: #7a9a64; border-color: #1e2a16; }
-    body.classic .price-val { color: #a4d007; font-family: Tahoma, sans-serif; }
-
-    body.classic .end-date { font-family: Tahoma, sans-serif; font-size: 0.64rem; color: #8a9a80; }
-    body.classic .end-date-urgent { color: #c0392b; }
-
-    /* ════════════════════════════════════════════════════
-       THÈME LIGHT
-       ════════════════════════════════════════════════════ */
-    body.light { background: #f0f2f5; color: #37474f; }
-    body.light::before { background: radial-gradient(ellipse 60% 40% at 20% 10%, rgba(26,115,232,0.03) 0%, transparent 70%); }
-    body.light .container { max-width: 1300px; }
-    body.light .header { border-bottom-color: rgba(0,0,0,0.06); }
-    body.light .header h1 { color: #212121; }
-    body.light .header-right .count { color: #1a73e8; }
-    body.light .header-right span { color: #78909c; }
-
-    body.light .gear-btn { background: #fff; border: 1px solid rgba(0,0,0,0.1); color: #78909c; border-radius: 10px; }
-    body.light .gear-btn:hover { border-color: rgba(0,0,0,0.2); color: #37474f; }
-    body.light .gear-dropdown { background: #fff; border: 1px solid rgba(0,0,0,0.12); box-shadow: 0 8px 30px rgba(0,0,0,0.12); border-radius: 10px; }
-    body.light .gear-item { color: #78909c; }
-    body.light .gear-item:hover { background: rgba(0,0,0,0.03); color: #37474f; }
-    body.light .gear-item.active-theme { color: #1a73e8; }
-    body.light .gear-sep { background: rgba(0,0,0,0.06); }
+    body.classic .badge, body.classic .status-badge, body.classic .metacritic { border-radius: 2px; }
+    body.classic .sort-btn { border-radius: 2px; background: linear-gradient(180deg, #3a4a30 0%, #2a3a20 100%); border-color: #4a5a40; }
+    body.classic .sort-btn.active { background: linear-gradient(180deg, #7a9a64 0%, #5a7a47 100%); }
+    body.classic .sidebar-btn { border-radius: 2px; font-size: 0.82rem; }
+    body.classic .stat-card, body.classic .search-box input, body.classic .gear-btn, body.classic .gear-dropdown { border-radius: 2px; }
+    body.classic .gear-btn { background: linear-gradient(180deg, #6b8a56 0%, #4a6637 100%); border: 1px solid #7a9a64; }
+    body.classic .gear-dropdown { background: #1a2612; border-color: #4a5a40; }
+    body.classic .gear-item { color: #8a9a80; } body.classic .gear-item.active-theme { color: #a4d007; }
+    body.classic .gear-sep { background: rgba(138,154,128,0.15); } body.classic .gear-danger { color: #b03a2e; }
+    body.classic .badge-high { background: #a4d007; } body.classic .badge-mid { background: #b8860b; } body.classic .badge-low { background: #b03a2e; }
+    body.classic .new { text-shadow: none; } body.classic .name { color: #d2e8b0; font-size: 0.88rem; }
+    body.classic .end-date { font-size: 0.7rem; color: #8a9a80; } body.classic .end-date-urgent { color: #c0392b; }
+    body.classic .sidebar-logo .version { border-radius: 2px; }
+    body.classic .price-slider input[type=range] { background: rgba(138,154,128,0.2); }
+    body.classic .price-slider input[type=range]::-webkit-slider-thumb { background: #7a9a64; border-color: #1e2a16; }
+    body.light { --bg-deep: #f0f2f5; --bg-card: #ffffff; --bg-sidebar: #f8f9fb; --border: rgba(0,0,0,0.07); --border-hover: rgba(0,0,0,0.16); --accent: #1a73e8; --accent-glow: rgba(26,115,232,0.08); --green: #2e7d32; --orange: #ef6c00; --red: #c62828; --text: #37474f; --text-dim: #78909c; --text-muted: #b0bec5; }
+    body.light .stat-card, body.light .card { box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+    body.light .card:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.08); }
+    body.light .sidebar { box-shadow: 1px 0 4px rgba(0,0,0,0.03); }
+    body.light .gear-dropdown { background: #fff; box-shadow: 0 8px 28px rgba(0,0,0,0.1); }
+    body.light .gear-item { color: #78909c; } body.light .gear-item:hover { background: rgba(0,0,0,0.03); color: #37474f; }
+    body.light .gear-item.active-theme { color: #1a73e8; } body.light .gear-sep { background: rgba(0,0,0,0.06); }
     body.light .gear-danger { color: #c62828; }
-    body.light .gear-danger:hover { background: rgba(198,40,40,0.04); }
+    body.light .name { color: #212121; } body.light .old { color: #b0bec5; } body.light .new { color: #2e7d32; text-shadow: none; }
+    body.light .badge-high { background: #2e7d32; color: #fff; } body.light .badge-mid { background: #ef6c00; color: #fff; } body.light .badge-low { background: #c62828; }
+    body.light .new-badge { background: #1a73e8; } body.light .status-badge { text-shadow: none; }
+    body.light .metacritic.mc-high { background: #2e7d32; } body.light .metacritic.mc-mid { background: #f9a825; color: #333; }
+    body.light .sort-btn.active { background: #1a73e8; color: #fff; }
+    body.light .search-box input::placeholder { color: #b0bec5; } body.light .img-wrap { background: #e8eaed; }
+    body.light .genre-tag { background: rgba(0,0,0,0.04); }
+    body.light .end-date { color: #78909c; } body.light .end-date-urgent { color: #c62828; }
+    body.light .stat-value { color: #212121; } body.light .stat-value.accent { color: #1a73e8; } body.light .stat-value.green { color: #2e7d32; }
+    body.light .price-slider input[type=range] { background: rgba(26,115,232,0.1); }
+    body.light .price-slider input[type=range]::-webkit-slider-thumb { background: #1a73e8; border-color: #f0f2f5; }
+    body.light .price-val { color: #1a73e8; } body.light .empty { color: #b0bec5; }
+    body.light .sidebar-logo h1 { color: #1a73e8; }
+    body.light .sidebar-btn.active { background: linear-gradient(135deg, rgba(26,115,232,0.08), rgba(26,115,232,0.03)); color: #1a73e8; }
+    body.light .new-only-btn.active { color: #1a73e8; } body.light .expiring-btn.active { color: #c62828; }
+    body.light .cat-active { color: #2e7d32; }
+    @media (max-width: 1100px) { .stats-row { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 900px) {
+        .sidebar { transform: translateX(-100%); }
+    
+    .mob-gear { position: relative; margin-left: auto; }
+    .sidebar-close { display: block; }
+        .sidebar.open .sidebar-close { display: block; }
+        .main { margin-left: 0; padding: 14px 10px; }
+        .mobile-bar { display: flex; align-items: center; gap: 10px; padding: 8px 0; margin-bottom: 10px; }
+        .mobile-bar .mob-title { font-family: var(--font-h); font-size: 0.8rem; font-weight: 700; color: #fff; text-transform: uppercase; }
+        .mobile-bar .mob-version { font-size: 0.5rem; color: var(--accent); background: var(--accent-glow); padding: 2px 5px; border-radius: 6px; font-weight: 600; }
+        .mobile-bar .mob-burger { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: var(--text-dim); cursor: pointer; margin-left: auto; }
+        .cart-bar { left: 0; }
+    }
+    @media (max-width: 640px) { .grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; } .stats-row { grid-template-columns: repeat(2, 1fr); } .price-slider { display: none; } }
 
-    body.light .stats { background: #fff; border: 1px solid rgba(0,0,0,0.06); border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
-    body.light .stats span { color: #78909c; }
-    body.light .stats .val { color: #1a73e8; }
-    body.light .stats .val-green { color: #2e7d32; }
+    .card-select { position: absolute; top: 8px; left: 8px; width: 22px; height: 22px; border-radius: 4px; border: 2px solid rgba(255,255,255,0.3); background: rgba(0,0,0,0.4); cursor: pointer; z-index: 3; opacity: 0; transition: opacity 0.2s; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 0.8rem; }
+    .card:hover .card-select, .card-select.checked { opacity: 1; }
+    .card-select.checked { background: var(--accent); border-color: var(--accent); }
+    .card.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent), 0 8px 28px rgba(0,0,0,0.35); }
+    .cart-bar { position: fixed; bottom: 0; left: 260px; right: 0; background: var(--bg-card); border-top: 2px solid var(--accent); padding: 12px 24px; display: none; align-items: center; gap: 16px; z-index: 50; box-shadow: 0 -4px 20px rgba(0,0,0,0.4); }
+    .cart-bar.visible { display: flex; }
+    .cart-info { display: flex; gap: 20px; align-items: center; flex: 1; }
+    .cart-stat { font-size: 0.82rem; color: var(--text-dim); }
+    .cart-stat strong { color: #fff; font-family: var(--font-h); }
+    .cart-stat .savings { color: var(--green); font-weight: 700; }
+    .cart-actions { display: flex; gap: 8px; }
+    .cart-btn { padding: 8px 18px; border-radius: 6px; border: none; font-family: var(--font-b); font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .cart-btn-steam { background: var(--green); color: #111; }
+    .cart-btn-steam:hover { filter: brightness(1.15); }
+    .cart-btn-clear { background: transparent; border: 1px solid var(--border); color: var(--text-dim); }
+    .cart-btn-clear:hover { border-color: var(--border-hover); color: var(--text); }
+    @media (max-width: 900px) { .cart-bar { left: 0; } }
 
-    body.light .search-box input { background: #fff; border: 1px solid rgba(0,0,0,0.1); color: #37474f; border-radius: 24px; }
-    body.light .search-box input:focus { border-color: #1a73e8; box-shadow: 0 0 8px rgba(26,115,232,0.12); }
-    body.light .search-box input::placeholder { color: #b0bec5; }
+    .help-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 200; align-items: center; justify-content: center; }
+    .help-overlay.visible { display: flex; }
+    .help-box { background: var(--bg-card); border: 1px solid var(--border-hover); border-radius: 10px; padding: 24px 28px; max-width: 520px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 16px 50px rgba(0,0,0,0.5); }
+    .help-box h2 { font-family: var(--font-h); font-size: 1.2rem; color: var(--accent); margin-bottom: 14px; }
+    .help-box h3 { font-size: 0.88rem; color: var(--green); margin: 12px 0 6px; }
+    .help-box p { font-size: 0.8rem; color: var(--text); line-height: 1.6; margin-bottom: 8px; }
+    .help-box code { background: rgba(102,192,244,0.1); padding: 1px 6px; border-radius: 3px; font-family: Consolas, monospace; font-size: 0.76rem; color: var(--accent); }
+    .help-close { float: right; background: none; border: none; color: var(--text-dim); font-size: 1.3rem; cursor: pointer; }
+    .help-close:hover { color: var(--text); }
 
-    body.light .toolbar button { background: #fff; border: 1px solid rgba(0,0,0,0.1); color: #78909c; }
-    body.light .toolbar button:hover { border-color: rgba(0,0,0,0.2); color: #37474f; }
-    body.light .toolbar button.active { background: #1a73e8; color: #fff; border-color: transparent; }
-
-    body.light .genre-btn { background: #fff; border: 1px solid rgba(0,0,0,0.08); color: #78909c; }
-    body.light .genre-btn:hover { background: rgba(46,125,50,0.06); color: #2e7d32; }
-    body.light .genre-btn.active { background: #2e7d32; color: #fff; border-color: transparent; }
-    body.light .new-only-btn.active { background: #1a73e8; }
-    body.light .expiring-btn.active { background: #c62828; }
-
-    body.light .cat-btn { background: #fff; border: 1px solid rgba(0,0,0,0.08); color: #78909c; }
-    body.light .cat-btn:hover { background: rgba(46,125,50,0.06); color: #2e7d32; }
-    body.light .cat-btn.active { background: #2e7d32; color: #fff; border-color: transparent; }
-
-    body.light .price-filter { border-left-color: rgba(0,0,0,0.08); }
-    body.light .price-filter label { color: #78909c; }
-    body.light .price-filter input[type=range] { background: rgba(26,115,232,0.1); }
-    body.light .price-filter input[type=range]::-webkit-slider-thumb { background: #1a73e8; border-color: #f0f2f5; }
-    body.light .price-filter input[type=range]::-moz-range-thumb { background: #1a73e8; border-color: #f0f2f5; }
-    body.light .price-val { color: #1a73e8; }
-
-    body.light .card { background: #fff; border: 1px solid rgba(0,0,0,0.06); border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
-    body.light .card:hover { border-color: rgba(0,0,0,0.12); box-shadow: 0 6px 20px rgba(0,0,0,0.08); }
-    body.light .img-wrap { background: #e8eaed; }
-    body.light .name { color: #212121; }
-    body.light .genre-tag { background: rgba(0,0,0,0.04); color: #78909c; }
-    body.light .old { color: #b0bec5; }
-    body.light .new { color: #2e7d32; text-shadow: none; }
-
-    body.light .badge-high { background: #2e7d32; color: #fff; }
-    body.light .badge-mid { background: #ef6c00; color: #fff; }
-    body.light .badge-low { background: #c62828; }
-    body.light .new-badge { background: #1a73e8; }
-    body.light .up-badge { background: #c62828; }
-    body.light .down-badge { background: #2e7d32; }
-    body.light .status-badge { text-shadow: none; }
-
-    body.light .metacritic.mc-high { background: #2e7d32; }
-    body.light .metacritic.mc-mid { background: #f9a825; color: #333; }
-    body.light .metacritic.mc-low { background: #c62828; }
-
-    body.light .end-date { color: #78909c; }
-    body.light .end-date-urgent { color: #c62828; }
-
-    body.light .empty { color: #b0bec5; }
+    .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9; }
+    .sidebar-overlay.visible { display: block; }
 </style>
 </head>
 <body>
-<div class="container">
 
-<div class="header">
-    <h1><span class="icon">🎮</span> Steam Wishlist — Promos</h1>
-    <div class="header-right">
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+<aside class="sidebar" id="sidebar">
+    <button class="sidebar-close" onclick="toggleSidebar()">&#10005;</button>
+    <div class="sidebar-logo"><span class="icon">&#127918;</span><h1>Steam Wishlist Sales Checker</h1><span class="version">v2.0</span></div>
+
+    <div class="sidebar-section">
+        <div class="sidebar-section-title">Filtres rapides</div>
+        <button class="sidebar-btn active" data-genre="all"><span>&#128203; Tout</span></button>
+        <button class="sidebar-btn new-only-btn" id="newOnlyBtn" onclick="toggleNewOnly()"><span>&#127381; Nouveaut&#233;s</span></button>
+        <button class="sidebar-btn expiring-btn" id="expiringBtn" onclick="toggleExpiring()" style="display:none"><span>&#9203; Expire bient&#244;t</span></button>
+    </div>
+
+    <div class="sidebar-divider"></div>
+
+    <div class="sidebar-section" id="genreSection">
+        <div class="sidebar-section-title">Genres</div>
 HTMLHEAD
 
 # ── Partie dynamique (variables Bash interpolées) ──
 cat >> "$OUTPUT_FILE" << HTMLMETA
-        <span class="count" id="count">${SALE_COUNT} jeu$([ "$SALE_COUNT" -gt 1 ] && echo "x") en promo</span>
-        <span>Mis à jour le ${NOW} (${ELAPSED}s)</span>
-        <div class="gear-wrap" id="gearWrap">
-            <button class="gear-btn" onclick="this.parentElement.classList.toggle('open')">&#9881;</button>
-            <div class="gear-dropdown">
-                <a class="gear-item" href="run.php"><span class="g-ico">&#8635;</span> Actualiser le scan</a>
-                <button class="gear-item gear-danger" onclick="clearCache()"><span class="g-ico">&#128465;</span> Vider le cache</button>
+        ${GENRE_BUTTONS}
+    </div>
+
+    <div class="sidebar-divider"></div>
+
+    <div class="sidebar-section" id="catSection">
+        <div class="sidebar-section-title">Mode de jeu</div>
+        <button class="sidebar-btn active" data-cat="all"><span>&#128203; Tous</span></button>
+        ${CAT_BUTTONS}
+    </div>
+
+    <div class="sidebar-meta">G&#233;n&#233;r&#233; le ${NOW} (${ELAPSED}s)</div>
+</aside>
+
+<div class="main">
+    <div class="mobile-bar"><span class="mob-title">&#127918; Steam Wishlist Sales Checker</span><span class="mob-version">v2.0</span><button class="mob-burger" onclick="toggleSidebar()">&#9776;</button></div>
+    <div class="topbar">
+        <div class="search-box"><input type="text" id="search" placeholder="Rechercher un jeu..." /></div>
+        <div class="topbar-right">
+            <span class="count-topbar" id="count">${SALE_COUNT} jeu$([ "$SALE_COUNT" -gt 1 ] && echo "x") en promo</span>
+            <div class="gear-wrap" id="gearWrap">
+                <button class="gear-btn" onclick="this.parentElement.classList.toggle('open')">&#9881;</button>
+                <div class="gear-dropdown">
+                    <a class="gear-item" href="run.php"><span class="g-ico">&#8635;</span> Actualiser le scan</a>
+                    <button class="gear-item gear-danger" onclick="clearCache()"><span class="g-ico">&#128465;</span> Vider le cache</button>
+                    <div class="gear-sep"></div>
+                    <button class="gear-item" id="thModern" onclick="setTheme('modern')"><span class="g-ico">&#10024;</span> Th&#232;me Modern</button>
+                    <button class="gear-item" id="thClassic" onclick="setTheme('classic')"><span class="g-ico">&#128421;</span> Th&#232;me Classic Steam</button>
+                    <button class="gear-item" id="thLight" onclick="setTheme('light')"><span class="g-ico">&#9728;</span> Th&#232;me Light</button>
+                    <div class="gear-sep"></div>
+                    <a class="gear-item" href="https://steamdb.info/sales/history/" target="_blank" rel="noopener"><span class="g-ico">&#128197;</span> Calendrier des Soldes</a>
                 <div class="gear-sep"></div>
-                <button class="gear-item" id="thModern" onclick="setTheme('modern')"><span class="g-ico">&#10024;</span> Thème Modern</button>
-                <button class="gear-item" id="thClassic" onclick="setTheme('classic')"><span class="g-ico">&#128421;</span> Thème Classic Steam</button>
-                <button class="gear-item" id="thLight" onclick="setTheme('light')"><span class="g-ico">&#9728;</span> Thème Light</button>
-                <div class="gear-sep"></div>
-                <a class="gear-item" href="https://steamdb.info/sales/history/" target="_blank" rel="noopener"><span class="g-ico">&#128197;</span> Calendrier des Soldes</a>
+                <button class="gear-item" onclick="showHelp()"><span class="g-ico">&#10067;</span> Aide</button>
+                <a class="gear-item" href="https://github.com/W1p3out/steam-wishlist-sales-checker" target="_blank" rel="noopener"><span class="g-ico">&#128187;</span> GitHub</a>
+                </div>
             </div>
         </div>
-    </div>
-</div>
+        </div>
 
-<div class="stats">
-    <span>Wishlist : <span class="val">${TOTAL} jeux</span></span>
-    <span>En promo : <span class="val-green">${SALE_COUNT}</span></span>
-    <span>Meilleure remise : <span class="val-green">-${BEST_DISCOUNT}%</span></span>
-    <span>Prix le plus bas : <span class="val-green">${CHEAPEST_FMT}€</span></span>
-    <span>Prochain scan auto : <span class="val" id="nextScan"></span></span>
-</div>
-
-<div class="controls">
-    <div class="search-box">
-        <input type="text" id="search" placeholder="Rechercher un jeu..." />
+    <div class="stats-row">
+        <div class="stat-card"><div class="stat-label">Wishlist</div><div class="stat-value">${TOTAL}</div></div>
+        <div class="stat-card"><div class="stat-label">En promo</div><div class="stat-value accent">${SALE_COUNT}</div></div>
+        <div class="stat-card"><div class="stat-label">Meilleure remise</div><div class="stat-value green">-${BEST_DISCOUNT}%</div></div>
+        <div class="stat-card"><div class="stat-label">Prix le plus bas</div><div class="stat-value green">${CHEAPEST_FMT}&#8364;</div></div>
+        <div class="stat-card"><div class="stat-label">Dur&#233;e du scan</div><div class="stat-value">${ELAPSED}s</div></div>
+        <div class="stat-card"><div class="stat-label">Prochain scan</div><div class="stat-value accent" id="nextScanCard">--:--</div></div>
     </div>
-    <div class="toolbar">
-        <button class="active" data-sort="alpha">A→Z</button>
-        <button data-sort="alpha_desc">Z→A</button>
-        <button data-sort="price_asc">Prix ↑</button>
-        <button data-sort="price_desc">Prix ↓</button>
-        <button data-sort="discount">% Promo</button>
-        <button data-sort="metacritic">Metacritic</button>
-        <div class="price-filter">
+
+    <div class="toolbar-row">
+        <span class="label">Trier :</span>
+        <button class="sort-btn active" data-sort="alpha">A&#8594;Z</button>
+        <button class="sort-btn" data-sort="alpha_desc">Z&#8594;A</button>
+        <button class="sort-btn" data-sort="price_asc">Prix &#8593;</button>
+        <button class="sort-btn" data-sort="price_desc">Prix &#8595;</button>
+        <button class="sort-btn" data-sort="discount">% Promo</button>
+        <button class="sort-btn" data-sort="metacritic">Metacritic</button>
+        <div class="price-slider">
             <label>En dessous de</label>
             <input type="range" id="priceMax" min="0" max="${MAX_PRICE_EUR}" value="${MAX_PRICE_EUR}" step="1">
-            <span class="price-val" id="priceLabel">${MAX_PRICE_EUR}€</span>
+            <span class="price-val" id="priceLabel">${MAX_PRICE_EUR}&#8364;</span>
         </div>
     </div>
-</div>
-
-<div class="genre-filters" id="genreFilters">
-    <button class="genre-btn active" data-genre="all">Tous</button>
-    <button class="genre-btn new-only-btn" id="newOnlyBtn" onclick="toggleNewOnly()">🆕 Nouveautés</button>
-    <button class="genre-btn expiring-btn" id="expiringBtn" onclick="toggleExpiring()" style="display:none">⏳ Expire bientôt</button>
-    ${GENRE_BUTTONS}
-</div>
-
-<div class="cat-filters" id="catFilters">
-    <button class="cat-btn active" data-cat="all">Tous</button>
-    ${CAT_BUTTONS}
-</div>
 HTMLMETA
 
 # ── Grille de cartes ──
@@ -939,10 +778,90 @@ document.querySelectorAll('.card').forEach((c, i) => {
     c.style.animationDelay = Math.min(i * 30, 800) + 'ms';
 });
 
+// ── Panier (sélection de jeux) ──
+document.querySelectorAll('.card').forEach(c => {
+    var cb = document.createElement('div');
+    cb.className = 'card-select';
+    cb.innerHTML = '&#10003;';
+    c.querySelector('.img-wrap').appendChild(cb);
+    cb.addEventListener('click', function(e) {
+        e.preventDefault(); e.stopPropagation();
+        c.classList.toggle('selected');
+        cb.classList.toggle('checked');
+        updateCart();
+    });
+});
+function updateCart() {
+    var sel = document.querySelectorAll('.card.selected');
+    var bar = document.getElementById('cartBar');
+    if (sel.length === 0) { bar.classList.remove('visible'); document.querySelector('.main').style.paddingBottom = ''; return; }
+    bar.classList.add('visible');
+    document.querySelector('.main').style.paddingBottom = '80px';
+    var total = 0, original = 0;
+    sel.forEach(function(c) { total += parseInt(c.dataset.sale) || 0; original += parseInt(c.dataset.originalPrice || c.querySelector('.old').textContent.replace(/[^0-9,]/g,'').replace(',','.') * 100) || 0; });
+    // Parse original from .old text
+    original = 0; total = 0;
+    sel.forEach(function(c) {
+        total += parseInt(c.dataset.sale) || 0;
+        var oldEl = c.querySelector('.old');
+        if (oldEl) { original += Math.round(parseFloat(oldEl.textContent.replace(/[^\d,]/g,'').replace(',','.')) * 100); }
+    });
+    var savings = original - total;
+    document.getElementById('cartCount').textContent = sel.length;
+    document.getElementById('cartTotal').textContent = (total / 100).toFixed(2).replace('.',',') + '\u20ac';
+    document.getElementById('cartSavings').textContent = (savings / 100).toFixed(2).replace('.',',') + '\u20ac';
+}
+
+function openCartInSteam() {
+    var sel = document.querySelectorAll('.card.selected');
+    var ids = [], names = [];
+    sel.forEach(function(c) {
+        var m = c.href.match(/\/app\/(\d+)/);
+        if (m) { ids.push(m[1]); names.push(c.querySelector('.name').textContent); }
+    });
+    if (ids.length === 0) return;
+    var html = '<html><head><title>Steam - Panier SWSC</title><style>body{background:#1b2838;color:#c7d5e0;font-family:Arial,sans-serif;padding:30px}h1{color:#66c0f4;margin-bottom:20px}a{display:block;color:#a4d007;font-size:1.1rem;margin:8px 0;text-decoration:none}a:hover{color:#fff}</style></head><body>';
+    html += '<h1>\ud83d\uded2 ' + ids.length + ' jeu(x) s\u00e9lectionn\u00e9(s)</h1>';
+    html += '<p style="color:#8f98a0;margin-bottom:20px">Cliquez sur chaque jeu pour l\'ajouter \u00e0 votre panier Steam :</p>';
+    for (var i = 0; i < ids.length; i++) {
+        html += '<a href="https://store.steampowered.com/app/' + ids[i] + '/" target="_blank">\u27a1 ' + names[i] + '</a>';
+    }
+    html += '</body></html>';
+    var w = window.open('', '_blank');
+    if (w) { w.document.write(html); w.document.close(); }
+}
+function toggleSidebar() {
+    var sb = document.getElementById('sidebar');
+    var ov = document.getElementById('sidebarOverlay');
+    sb.classList.toggle('open');
+    ov.classList.toggle('visible');
+}
+// Close sidebar when clicking a filter on mobile
+document.querySelectorAll('.sidebar-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        if (window.innerWidth <= 900) {
+            document.getElementById('sidebar').classList.remove('open');
+            document.getElementById('sidebarOverlay').classList.remove('visible');
+        }
+    });
+});
+function showHelp() {
+    document.getElementById('helpOverlay').classList.add('visible');
+    document.getElementById('gearWrap').classList.remove('open');
+}
+function clearCart() {
+    document.querySelector('.main').style.paddingBottom = '';
+    document.querySelectorAll('.card.selected').forEach(function(c) {
+        c.classList.remove('selected');
+        c.querySelector('.card-select').classList.remove('checked');
+    });
+    updateCart();
+}
+
 // ── Tri ──
-document.querySelectorAll('.toolbar button').forEach(btn => {
+document.querySelectorAll('.sort-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-        document.querySelectorAll('.toolbar button').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         const grid = document.getElementById('grid');
         const cards = Array.from(grid.querySelectorAll('.card'));
@@ -1014,20 +933,21 @@ document.getElementById('search').addEventListener('input', function() {
     applyFilters();
 });
 
-document.querySelectorAll('.genre-btn:not(.new-only-btn):not(.expiring-btn)').forEach(btn => {
+document.querySelectorAll('.sidebar-btn[data-genre]').forEach(btn => {
     btn.addEventListener('click', () => {
-        document.querySelectorAll('.genre-btn:not(.new-only-btn):not(.expiring-btn)').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.sidebar-btn[data-genre]').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         activeGenre = btn.dataset.genre;
         applyFilters();
     });
 });
 
-document.querySelectorAll('.cat-btn').forEach(btn => {
+document.querySelectorAll('.sidebar-btn[data-cat]').forEach(btn => {
     btn.addEventListener('click', () => {
-        document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.sidebar-btn[data-cat]').forEach(b => { b.classList.remove('active'); b.classList.remove('cat-active'); });
         btn.classList.add('active');
         activeCat = btn.dataset.cat;
+        btn.classList.add('cat-active');
         applyFilters();
     });
 });
@@ -1061,6 +981,21 @@ function toggleExpiring() {
 }
 
 // ── Switch de thème via roue crantée ──
+
+// ── Inject icons ──
+var GENRE_ICONS = {'Action':'&#9876;&#65039;','Adventure':'&#128506;&#65039;','Casual':'&#129513;','Early Access':'&#129514;','Free To Play':'&#127873;','Free to Play':'&#127873;','Indie':'&#128377;&#65039;','Massively Multiplayer':'&#127760;','Racing':'&#127950;&#65039;','RPG':'&#127922;','Simulation':'&#127959;&#65039;','Sports':'&#9917;','Strategy':'&#9823;&#65039;','Animation &amp; Modeling':'&#127902;&#65039;','Audio Production':'&#128266;','Design &amp; Illustration':'&#127912;','Education':'&#128218;','Game Development':'&#127916;','Photo Editing':'&#128248;','Utilities':'&#128295;&#65039;','Video Production':'&#127909;','Web Publishing':'&#127760;'};
+var CAT_ICONS = {'Single-player':'&#128100;','Single player':'&#128100;','Un joueur':'&#128100;','Multi-player':'&#128101;','Multi player':'&#128101;','Multijoueur':'&#128101;','Co-op':'&#129309;','Online Co-op':'&#129309;','Online Co-Op':'&#129309;','Coop':'&#129309;','LAN Co-op':'&#128268;','LAN Co-Op':'&#128268;','PvP':'&#9889;','Online PvP':'&#9889;','LAN PvP':'&#9876;&#65039;','MMO':'&#127760;','Cross-Platform Multiplayer':'&#128421;&#65039;','Multi cross-platform':'&#128421;&#65039;','Shared/Split Screen':'&#128250;','Shared/Split Screen Co-op':'&#128250;','Shared/Split Screen PvP':'&#128250;'};
+document.querySelectorAll('.sidebar-btn[data-genre]').forEach(function(b) {
+    var g = b.dataset.genre; if (g !== 'all' && GENRE_ICONS[g]) {
+        var sp = b.querySelector('span'); if (sp) sp.innerHTML = GENRE_ICONS[g] + ' ' + sp.textContent;
+    }
+});
+document.querySelectorAll('.sidebar-btn[data-cat]').forEach(function(b) {
+    var ct = b.dataset.cat; if (ct !== 'all' && CAT_ICONS[ct]) {
+        var sp = b.querySelector('span'); if (sp) sp.innerHTML = CAT_ICONS[ct] + ' ' + sp.textContent;
+    }
+});
+
 function setTheme(theme) {
     document.body.className = (theme === 'classic') ? 'classic' : (theme === 'light') ? 'light' : '';
     document.cookie = 'theme=' + theme + ';path=/;max-age=31536000';
@@ -1089,7 +1024,7 @@ document.addEventListener('click', function(e) {
 
 // ── Prochain scan auto ──
 (function() {
-    const schedules = SCAN_SCHEDULE || [1, 7, 13, 19];
+    const schedules = (typeof SCAN_SCHEDULE !== 'undefined' && SCAN_SCHEDULE.length > 0) ? SCAN_SCHEDULE : [19];
     const now = new Date();
     let next = null;
     for (const h of schedules) {
@@ -1102,14 +1037,14 @@ document.addEventListener('click', function(e) {
         next.setDate(next.getDate() + 1);
         next.setHours(schedules[0], 5, 0, 0);
     }
-    const el = document.getElementById('nextScan');
     function update() {
         const diff = Math.max(0, Math.floor((next - new Date()) / 1000));
         const h = Math.floor(diff / 3600);
         const m = Math.floor((diff % 3600) / 60);
         const hh = String(next.getHours()).padStart(2, '0');
         const mm = String(next.getMinutes()).padStart(2, '0');
-        el.textContent = hh + ':' + mm + ' (dans ' + h + 'h' + String(m).padStart(2,'0') + ')';
+        var sc = document.getElementById('nextScanCard');
+        if (sc) sc.textContent = hh + ':' + mm + ' (' + h + 'h' + String(m).padStart(2,'0') + ')';
     }
     update();
     setInterval(update, 60000);
@@ -1161,6 +1096,39 @@ if (document.cookie.includes('swsc_endofsales=on')) {
 }
 </script>
 
+</div>
+<div class="help-overlay" id="helpOverlay" onclick="if(event.target===this)this.classList.remove('visible')">
+    <div class="help-box">
+        <button class="help-close" onclick="document.getElementById('helpOverlay').classList.remove('visible')">&times;</button>
+        <h2>&#10067; Aide &#8212; Steam Wishlist Sales Checker</h2>
+        <h3>&#128270; Recherche</h3>
+        <p>Tapez un nom de jeu pour filtrer en temps r&#233;el.</p>
+        <h3>&#9881; Roue crant&#233;e</h3>
+        <p>Actualiser le scan, vider le cache, changer de th&#232;me (Modern / Classic Steam / Light), acc&#233;der au calendrier des soldes Steam.</p>
+        <h3>&#128203; Filtres</h3>
+        <p>Cliquez sur un genre ou mode de jeu dans la barre lat&#233;rale pour filtrer. Tous les filtres sont cumulatifs avec la recherche et le slider prix.</p>
+        <h3>&#127381; Nouveaut&#233;s</h3>
+        <p>Affiche uniquement les jeux apparus en promo depuis le dernier scan.</p>
+        <h3>&#9203; Expire bient&#244;t</h3>
+        <p>Visible si le scraping des dates est activ&#233;. Affiche les promos expirant sous 72h.</p>
+        <h3>&#9203; Dates de fin de promo</h3>
+        <p>Tapez <code>swsc:endofsales-on</code> dans la recherche pour activer le scraping des dates de fin. <code>swsc:endofsales-off</code> pour d&#233;sactiver. Non activ&#233; par d&#233;faut car Steam peut casser cette possibilit&#233; &#224; tout moment. Le scraping ajoute ~1s par jeu.</p>
+        <h3>&#128722; Panier</h3>
+        <p>Cliquez sur le &#10003; en haut &#224; gauche d'une carte pour s&#233;lectionner un jeu. Une barre appara&#238;t en bas avec le total, l'&#233;conomie et un bouton pour ouvrir les pages Steam. D&#233;sactivez votre bloqueur de pubs pour ouvrir plusieurs onglets.</p>
+        <h3>&#127918; Version</h3>
+        <p>SWSC v2.0 &#8212; Code g&#233;n&#233;r&#233; avec Claude (Anthropic)</p>
+    </div>
+</div>
+<div class="cart-bar" id="cartBar">
+    <div class="cart-info">
+        <span class="cart-stat">&#128722; <strong id="cartCount">0</strong> jeu(x)</span>
+        <span class="cart-stat">Total : <strong id="cartTotal">0,00&#8364;</strong></span>
+        <span class="cart-stat">&#201;conomie : <span class="savings" id="cartSavings">0,00&#8364;</span></span>
+    </div>
+    <div class="cart-actions">
+        <button class="cart-btn cart-btn-steam" onclick="openCartInSteam()" title="D&#233;sactivez votre bloqueur de pubs si les pages ne s'ouvrent pas">&#127918; Ouvrir sur Steam (Web)</button>
+        <button class="cart-btn cart-btn-clear" onclick="clearCart()">&#10005; Vider</button>
+    </div>
 </div>
 </body>
 </html>

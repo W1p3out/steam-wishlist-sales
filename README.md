@@ -1,11 +1,10 @@
-# 🎮 Steam Wishlist Sales (v1.4)
+# 🎮 Steam Wishlist Sales (v2.0)
 
 Code written with Claude (Anthropic). This is a learning project to see how "curl" and "Invoke-RestMethod" commands can grab information from the Steam API. An executable is also available for Windows to simply check your wishlist sales without any installation, in the Releases page.
 
 Automatically monitors your Steam wishlist and displays discounted games on a sleek, self-hosted web page.
 
-![Steam Wishlist Sales](screenshots/preview.png)
-![Steam Wishlist Sales](screenshots/preview2.png)
+![Steam Wishlist Sales](screenshots/preview.gif)
 
 ## Features
 
@@ -17,8 +16,8 @@ Automatically monitors your Steam wishlist and displays discounted games on a sl
 - **Genre filters**: Action, RPG, Indie, Racing, Strategy... (21 genres)
 - **Category filters**: Single-player, Multi-player, Co-op, PvP, MMO, LAN, Split Screen...
 - **New only filter**: show only newly discounted games
-- **⏳ "Expiring soon" filter**: show promos expiring within 72 hours
-- **End-of-sale dates** (optional): live countdown "⏳ 2d 5h 34min" ticking every second
+- **⏳ "Expiring soon" filter**: show promos expiring within 72 hours (when end dates are enabled)
+- **End-of-sale dates** (optional, disabled by default): scrapes Steam store pages to retrieve promotion end dates. A live countdown "⏳ 2d 5h 34min" then appears below each card. Enable with `swsc:endofsales-on` (Linux) or `-ScrapeEndDates` (PowerShell/exe)
 - **Price slider**: filter games below a maximum price
 - **Smart cache**: only new sale entries trigger API calls (5x faster scans)
 - **Sorting**: A→Z, Z→A, price ascending/descending, discount %, Metacritic score
@@ -28,7 +27,7 @@ Automatically monitors your Steam wishlist and displays discounted games on a sl
 - **Statistics**: sale count, best discount, lowest price, next scan countdown
 - **Responsive**: adapts to mobile and desktop
 - **Lightweight**: static HTML page, no database required
-- **Windows version**: standalone PowerShell script included
+- **Windows version**: standalone PowerShell script included + **executable (.exe)** available in the [Releases](https://github.com/W1p3out/steam-wishlist-sales-checker/releases) page
 
 ## Requirements
 
@@ -41,8 +40,8 @@ Automatically monitors your Steam wishlist and displays discounted games on a sl
 
 ### Windows (standalone version)
 
-- **Windows 10/11** with **PowerShell 5.1+**
-- No other dependencies
+- **Windows 10/11** with **PowerShell 5.1+** (.ps1 script)
+- Or the **executable (.exe)** from the [Releases](https://github.com/W1p3out/steam-wishlist-sales-checker/releases) page — no dependencies required
 
 ## Quick Install (Linux as root user)
 
@@ -57,7 +56,7 @@ The installer will ask for:
 
 | Parameter | Description | Example |
 |---|---|---|
-| **Steam ID** | Your 64-bit Steam identifier (17 digits) | `76561198040773990` |
+| **Steam ID** | Your 64-bit Steam identifier (17 digits) | `12345678901234567` |
 | **Port** | Web server port | `2251` |
 | **Scan hours** | Automatic scan hours (cron format) | `1,7,13,19` |
 
@@ -68,11 +67,11 @@ The installer will ask for:
 ## Windows Usage (PowerShell)
 
 ```powershell
-.\SteamWishlistSales.ps1 -SteamID 76561198040773990
-.\SteamWishlistSales.ps1 -SteamID 76561198040773990 -Country us
-.\SteamWishlistSales.ps1 76561198040773990 -ClearCache
-.\SteamWishlistSales.ps1 76561198040773990 -ScrapeEndDates
-.\SteamWishlistSales.ps1 76561198040773990 -ClearCache -ScrapeEndDates
+.\Steam_Wishlist_Sales_Checker.ps1 -SteamID 12345678901234567
+.\Steam_Wishlist_Sales_Checker.ps1 -SteamID 12345678901234567 -Country us
+.\Steam_Wishlist_Sales_Checker.ps1 12345678901234567 -ClearCache
+.\Steam_Wishlist_Sales_Checker.ps1 12345678901234567 -ScrapeEndDates
+.\Steam_Wishlist_Sales_Checker.ps1 12345678901234567 -ClearCache -ScrapeEndDates
 ```
 
 The script generates an HTML file in `%TEMP%` and opens it automatically in the browser. Cache is stored in `%APPDATA%\SteamWishlistSales\`.
@@ -96,7 +95,7 @@ Type `swsc:endofsales-on` in the search bar and press Enter. This creates a flag
 ### PowerShell Activation
 
 ```powershell
-.\SteamWishlistSales.ps1 76561198040773990 -ScrapeEndDates
+.\Steam_Wishlist_Sales_Checker.ps1 12345678901234567 -ScrapeEndDates
 ```
 
 ### How it works
@@ -199,7 +198,7 @@ sudo /opt/steam-wishlist-sales/steam-wishlist-sales.sh
 steam-wishlist-sales/
 ├── install.sh                     # Automated installation
 ├── uninstall.sh                   # Uninstallation
-├── SteamWishlistSales.ps1         # Windows version (standalone)
+├── Steam_Wishlist_Sales_Checker.ps1         # Windows version (standalone)
 ├── README.md / README_EN.md       # Documentation FR/EN
 ├── CHANGELOG.md                   # Version history
 ├── scripts/
@@ -238,6 +237,13 @@ These fields were added in v1.3. Clear the cache once: `-ClearCache` (PS) or but
 
 ### End-of-sale dates not showing
 Check that scraping is enabled. Not all promos have end dates — seasonal sales don't use individual countdowns.
+
+### "Open on Steam (Web)" button doesn't open all games
+
+If only the first game opens, your browser is blocking multiple tabs. To fix:
+- **Chrome/Edge**: click the blocked popup icon in the address bar → "Always allow"
+- **Firefox**: click the yellow bar at the top → "Allow popups"
+- Disable your **ad blocker** for this page if needed
 
 ### UTF-8 error in PowerShell
 The script must be encoded as UTF-8 with BOM. Save as "UTF-8 with BOM" if you edit it.
