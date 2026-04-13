@@ -86,6 +86,26 @@ if ($SteamID -notmatch '^\d{17}$') {
 # -- Output paths --------------------------------------------------
 if (-not $OutputPath) {
     $OutputPath = Join-Path $env:TEMP 'steam-wishlist-sales.html'
+} else {
+    # Si l'utilisateur fournit un dossier (existant ou se terminant par \), ajouter le nom de fichier
+    if ((Test-Path $OutputPath -PathType Container) -or $OutputPath.EndsWith('\') -or $OutputPath.EndsWith('/')) {
+        $OutputPath = Join-Path $OutputPath 'steam-wishlist-sales.html'
+    }
+    # S'assurer que le chemin a une extension .html
+    elseif (-not [System.IO.Path]::HasExtension($OutputPath)) {
+        $OutputPath = "$OutputPath.html"
+    }
+    # Créer le dossier parent s'il n'existe pas
+    $ParentDir = Split-Path -Parent $OutputPath
+    if ($ParentDir -and -not (Test-Path $ParentDir)) {
+        try {
+            New-Item -ItemType Directory -Path $ParentDir -Force | Out-Null
+        } catch {
+            Write-Err "Impossible de creer le dossier : $ParentDir"
+            Write-Err $_.Exception.Message
+            exit 1
+        }
+    }
 }
 $CacheDir = Join-Path $env:APPDATA 'SteamWishlistSales'
 $CachePath = Join-Path $CacheDir "cache_$SteamID.json"
