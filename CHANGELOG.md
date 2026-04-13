@@ -18,6 +18,22 @@
 
 **CSS unifié via variables** : les 3 thèmes (Modern, Classic Steam, Light) utilisent des variables CSS (:root) pour les couleurs, ce qui réduit le code de ~300 lignes de CSS dupliqué à ~100 lignes d'overrides.
 
+#### 🛒 Panier multi-jeux
+
+Une case à cocher (✓) apparaît au survol de chaque vignette. En cliquant dessus, le jeu est sélectionné (bordure bleue) et une barre flottante apparaît en bas de l'écran. Cette barre affiche le nombre de jeux sélectionnés, le prix total et l'économie réalisée.
+
+Le bouton **« 🎮 Ouvrir sur Steam (Web) »** ouvre les pages Steam de tous les jeux sélectionnés. La version Linux génère une page intermédiaire avec des liens cliquables (compatible avec tous les navigateurs). La version PowerShell ouvre directement chaque jeu dans un nouvel onglet via la technique du `<a>.click()` programmé avec un délai de 400ms entre chaque ouverture pour contourner les bloqueurs de popups.
+
+Un tooltip au survol du bouton avertit l'utilisateur que les bloqueurs de pubs/popups peuvent empêcher l'ouverture multiple et qu'il faut autoriser cette page si nécessaire.
+
+#### 📱 Mobile responsive avec hamburger
+
+Sur mobile (< 900px), un bandeau en haut affiche le titre « 🎮 Steam Wishlist Sales Checker v2.0 » avec le menu ⚙️ à droite. Une barre topbar contient la recherche, le compteur de promos et le bouton ☰ qui fait glisser la sidebar avec un overlay sombre. Cliquer sur un filtre referme automatiquement la sidebar pour ne pas masquer les résultats.
+
+#### ❓ Aide intégrée
+
+Un bouton « ❓ Aide » dans la roue crantée ouvre une modale détaillant toutes les fonctionnalités : recherche, filtres, panier, dates de fin de promo, et arguments PowerShell avec création de raccourci Windows.
+
 #### 📊 Métriques
 
 | Fichier | v1.4 | v2.0 | Delta |
@@ -42,6 +58,22 @@ Le code est plus court malgré l'ajout de fonctionnalités car le CSS est mieux 
 **Sort toolbar**: sort buttons with price slider in a dedicated bar below stats.
 
 **Unified CSS variables**: all 3 themes (Modern, Classic Steam, Light) use CSS variables (:root), reducing ~300 lines of duplicated CSS to ~100 lines of overrides.
+
+#### 🛒 Multi-game cart
+
+A checkbox (✓) appears when hovering over each card. Clicking it selects the game (blue border) and a floating bar appears at the bottom of the screen. This bar shows the number of selected games, total price and savings.
+
+The **"🎮 Open on Steam (Web)"** button opens Steam pages for all selected games. The Linux version generates an intermediate page with clickable links (compatible with all browsers). The PowerShell version opens each game directly in a new tab using the programmatic `<a>.click()` technique with a 400ms delay between each opening to bypass popup blockers.
+
+A tooltip on hover warns the user that ad/popup blockers may prevent multiple openings and must be allowed for this page if needed.
+
+#### 📱 Mobile responsive with hamburger menu
+
+On mobile (< 900px), a top banner shows the title "🎮 Steam Wishlist Sales Checker v2.0" with the ⚙️ menu on the right. A topbar contains the search, promo counter and the ☰ button that slides the sidebar with a dark overlay. Clicking a filter automatically closes the sidebar to avoid hiding results.
+
+#### ❓ Built-in help
+
+A "❓ Help" button in the gear menu opens a modal detailing all features: search, filters, cart, end-of-sale dates, and PowerShell arguments with Windows shortcut creation.
 
 #### 📊 Metrics
 
