@@ -19,6 +19,7 @@ Automatically monitors your Steam wishlist and displays discounted games on a sl
 - **⏳ "Expiring soon" filter**: show promos expiring within 72 hours (when end dates are enabled)
 - **End-of-sale dates** (optional, disabled by default): scrapes Steam store pages to retrieve promotion end dates. A live countdown "⏳ 2d 5h 34min" then appears below each card. Enable with `swsc:endofsales-on` (Linux) or `-ScrapeEndDates` (PowerShell/exe)
 - **Price slider**: filter games below a maximum price
+- **🛒 Multi-game cart**: tick ✓ on cards to select multiple games. A floating bar shows total and savings. The "Open on Steam (Web)" button opens Steam pages for all selected games in one click
 - **Smart cache**: only new sale entries trigger API calls (5x faster scans)
 - **Sorting**: A→Z, Z→A, price ascending/descending, discount %, Metacritic score
 - **Real-time search** by game name

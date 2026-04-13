@@ -19,6 +19,7 @@ Surveille automatiquement votre wishlist Steam et affiche les jeux en promotion 
 - **⏳ Filtre "Expire bientôt"** : affiche les promos expirant dans moins de 72h (si dates de fin activées)
 - **Dates de fin de promo** (optionnel, désactivé par défaut) : active le scraping des pages Steam pour récupérer les dates de fin. Un countdown en temps réel "⏳ 2j 5h 34min" s'affiche alors sous chaque carte. Activation : `swsc:endofsales-on` (Linux) ou `-ScrapeEndDates` (PowerShell/exe)
 - **Slider de prix** : filtrer les jeux en dessous d'un prix maximum
+- **🛒 Panier multi-jeux** : cochez ✓ sur les vignettes pour sélectionner plusieurs jeux. Une barre flottante affiche le total et l'économie réalisée. Le bouton « Ouvrir sur Steam (Web) » ouvre les pages Steam de tous les jeux sélectionnés en un clic
 - **Cache intelligent** : seuls les nouveaux jeux en promo déclenchent des appels API (scans 5x plus rapides)
 - **Tri** : A→Z, Z→A, prix croissant/décroissant, % promo, score Metacritic
 - **Recherche** en temps réel par nom de jeu
