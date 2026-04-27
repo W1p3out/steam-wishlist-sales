@@ -675,7 +675,7 @@ cat > "$OUTPUT_FILE" << 'HTMLHEAD'
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 <aside class="sidebar" id="sidebar">
     <button class="sidebar-close" onclick="toggleSidebar()">&#10005;</button>
-    <div class="sidebar-logo"><span class="icon">&#127918;</span><h1>Steam Wishlist Sales Checker</h1><span class="version">v2.0</span></div>
+    <div class="sidebar-logo"><span class="icon">&#127918;</span><h1>Steam Wishlist Sales Checker</h1><span class="version">v2.0.1</span></div>
 
     <div class="sidebar-section">
         <div class="sidebar-section-title">Filtres rapides</div>
@@ -707,7 +707,7 @@ cat >> "$OUTPUT_FILE" << HTMLMETA
 </aside>
 
 <div class="main">
-    <div class="mobile-bar"><span class="mob-title">&#127918; Steam Wishlist Sales Checker</span><span class="mob-version">v2.0</span><button class="mob-burger" onclick="toggleSidebar()">&#9776;</button></div>
+    <div class="mobile-bar"><span class="mob-title">&#127918; Steam Wishlist Sales Checker</span><span class="mob-version">v2.0.1</span><button class="mob-burger" onclick="toggleSidebar()">&#9776;</button></div>
     <div class="topbar">
         <div class="search-box"><input type="text" id="search" placeholder="Rechercher un jeu..." /></div>
         <div class="topbar-right">
@@ -814,21 +814,25 @@ function updateCart() {
 
 function openCartInSteam() {
     var sel = document.querySelectorAll('.card.selected');
-    var ids = [], names = [];
+    var ids = [];
     sel.forEach(function(c) {
         var m = c.href.match(/\/app\/(\d+)/);
-        if (m) { ids.push(m[1]); names.push(c.querySelector('.name').textContent); }
+        if (m) ids.push(m[1]);
     });
     if (ids.length === 0) return;
-    var html = '<html><head><title>Steam - Panier SWSC</title><style>body{background:#1b2838;color:#c7d5e0;font-family:Arial,sans-serif;padding:30px}h1{color:#66c0f4;margin-bottom:20px}a{display:block;color:#a4d007;font-size:1.1rem;margin:8px 0;text-decoration:none}a:hover{color:#fff}</style></head><body>';
-    html += '<h1>\ud83d\uded2 ' + ids.length + ' jeu(x) s\u00e9lectionn\u00e9(s)</h1>';
-    html += '<p style="color:#8f98a0;margin-bottom:20px">Cliquez sur chaque jeu pour l\'ajouter \u00e0 votre panier Steam :</p>';
     for (var i = 0; i < ids.length; i++) {
-        html += '<a href="https://store.steampowered.com/app/' + ids[i] + '/" target="_blank">\u27a1 ' + names[i] + '</a>';
+        (function(id, delay) {
+            setTimeout(function() {
+                var a = document.createElement('a');
+                a.href = 'https://store.steampowered.com/app/' + id + '/';
+                a.target = '_blank';
+                a.rel = 'noopener';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }, delay);
+        })(ids[i], i * 400);
     }
-    html += '</body></html>';
-    var w = window.open('', '_blank');
-    if (w) { w.document.write(html); w.document.close(); }
 }
 function toggleSidebar() {
     var sb = document.getElementById('sidebar');
@@ -1116,7 +1120,7 @@ if (document.cookie.includes('swsc_endofsales=on')) {
         <h3>&#128722; Panier</h3>
         <p>Cliquez sur le &#10003; en haut &#224; gauche d'une carte pour s&#233;lectionner un jeu. Une barre appara&#238;t en bas avec le total, l'&#233;conomie et un bouton pour ouvrir les pages Steam. D&#233;sactivez votre bloqueur de pubs pour ouvrir plusieurs onglets.</p>
         <h3>&#127918; Version</h3>
-        <p>SWSC v2.0 &#8212; Code g&#233;n&#233;r&#233; avec Claude (Anthropic)</p>
+        <p>SWSC v2.0.1 &#8212; Code g&#233;n&#233;r&#233; avec Claude (Anthropic)</p>
     </div>
 </div>
 <div class="cart-bar" id="cartBar">

@@ -199,8 +199,10 @@ sudo /opt/steam-wishlist-sales/steam-wishlist-sales.sh
 steam-wishlist-sales/
 ├── install.sh                     # Installation automatique
 ├── uninstall.sh                   # Désinstallation
+├── update.sh                      # Mise à jour (patch en place)
 ├── Steam_Wishlist_Sales_Checker.ps1         # Version Windows (standalone)
-├── README.md / README_EN.md       # Documentation FR/EN
+├── README.md                      # Documentation (EN)
+├── README_FR.md                   # Documentation (FR)
 ├── CHANGELOG.md                   # Historique des versions
 ├── scripts/
 │   └── steam-wishlist-sales.sh    # Script principal (7 étapes)
@@ -248,6 +250,43 @@ Si seul le premier jeu s'ouvre, votre navigateur bloque l'ouverture de plusieurs
 
 ### Erreur UTF-8 PowerShell
 Le script doit être encodé en UTF-8 avec BOM. Sauvegardez en "UTF-8 with BOM" si vous l'éditez.
+
+## Mise à jour
+
+### Mise à jour automatique (patch en place)
+
+Pour les mises à jour mineures (ex: v2.0 → v2.0.1), un script `update.sh` est fourni. Il modifie directement le script installé sans toucher à votre configuration (Steam ID, heures de scan, pays) :
+
+```bash
+sudo ./update.sh
+```
+
+Le script :
+1. **Sauvegarde** l'ancien script (`.bak`)
+2. **Patche** le code en place avec Python (regex multiligne)
+3. **Met à jour** le numéro de version via `sed`
+4. **Vérifie** le résultat — en cas d'échec, restaure automatiquement la sauvegarde
+5. Relancez un scan pour regénérer le HTML : `sudo /opt/steam-wishlist-sales/steam-wishlist-sales.sh`
+
+### Mise à jour manuelle (remplacement complet)
+
+Pour les mises à jour majeures (ex: v2.0 → v3.0), remplacez le script et réinjectez votre configuration :
+
+```bash
+# Sauvegarder votre Steam ID
+grep "^STEAM_ID=" /opt/steam-wishlist-sales/steam-wishlist-sales.sh
+
+# Copier le nouveau script
+sudo cp scripts/steam-wishlist-sales.sh /opt/steam-wishlist-sales/
+
+# Réinjecter votre Steam ID
+sudo sed -i 's/^STEAM_ID=.*/STEAM_ID="VOTRE_STEAM_ID"/' /opt/steam-wishlist-sales/steam-wishlist-sales.sh
+
+# Relancer un scan
+sudo /opt/steam-wishlist-sales/steam-wishlist-sales.sh
+```
+
+> **Rappel** : le nouveau script contient un Steam ID placeholder (`12345678901234567`). Si vous copiez sans réinjecter votre ID, le scan retournera une erreur 400.
 
 ## Désinstallation
 

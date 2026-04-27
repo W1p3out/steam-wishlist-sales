@@ -200,7 +200,8 @@ steam-wishlist-sales/
 ├── install.sh                     # Automated installation
 ├── uninstall.sh                   # Uninstallation
 ├── Steam_Wishlist_Sales_Checker.ps1         # Windows version (standalone)
-├── README.md / README_EN.md       # Documentation FR/EN
+├── README.md                      # Documentation (EN)
+├── README_FR.md                   # Documentation (FR)
 ├── CHANGELOG.md                   # Version history
 ├── scripts/
 │   └── steam-wishlist-sales.sh    # Main script (7 steps)
@@ -248,6 +249,43 @@ If only the first game opens, your browser is blocking multiple tabs. To fix:
 
 ### UTF-8 error in PowerShell
 The script must be encoded as UTF-8 with BOM. Save as "UTF-8 with BOM" if you edit it.
+
+## Updating
+
+### Automatic update (in-place patch)
+
+For minor updates (e.g. v2.0 → v2.0.1), an `update.sh` script is provided. It modifies the installed script directly without touching your configuration (Steam ID, scan hours, country):
+
+```bash
+sudo ./update.sh
+```
+
+The script:
+1. **Backs up** the old script (`.bak`)
+2. **Patches** the code in place using Python (multiline regex)
+3. **Updates** the version number via `sed`
+4. **Verifies** the result — on failure, automatically restores the backup
+5. Rerun a scan to regenerate the HTML: `sudo /opt/steam-wishlist-sales/steam-wishlist-sales.sh`
+
+### Manual update (full replacement)
+
+For major updates (e.g. v2.0 → v3.0), replace the script and re-inject your configuration:
+
+```bash
+# Save your Steam ID
+grep "^STEAM_ID=" /opt/steam-wishlist-sales/steam-wishlist-sales.sh
+
+# Copy the new script
+sudo cp scripts/steam-wishlist-sales.sh /opt/steam-wishlist-sales/
+
+# Re-inject your Steam ID
+sudo sed -i 's/^STEAM_ID=.*/STEAM_ID="YOUR_STEAM_ID"/' /opt/steam-wishlist-sales/steam-wishlist-sales.sh
+
+# Rerun a scan
+sudo /opt/steam-wishlist-sales/steam-wishlist-sales.sh
+```
+
+> **Reminder**: the new script contains a placeholder Steam ID (`12345678901234567`). If you copy without re-injecting your ID, the scan will return a 400 error.
 
 ## Uninstallation
 
