@@ -1,4 +1,4 @@
-# 🎮 Steam Wishlist Sales (v2.0)
+# 🎮 Steam Wishlist Sales (v2.0.1)
 
 Code généré avec Claude (Anthropic). Ceci est un projet d'apprentissage pour comprendre comment les commandes "curl" et "Invoke-RestMethod" peuvent récupérer des informations via l'API Steam. Un exécutable est également disponible pour Windows pour simplement vérifier les promotions de votre liste de souhaits Steam sans aucune installation, dans la page "Releases".
 
