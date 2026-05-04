@@ -1,4 +1,4 @@
-# 🎮 Steam Wishlist Sales (v2.0.1)
+# 🎮 Steam Wishlist Sales Checker (v2.0.2)
 
 Code généré avec Claude (Anthropic). Ceci est un projet d'apprentissage pour comprendre comment les commandes "curl" et "Invoke-RestMethod" peuvent récupérer des informations via l'API Steam. Un exécutable est également disponible pour Windows pour simplement vérifier les promotions de votre liste de souhaits Steam sans aucune installation, dans la page "Releases".
 
@@ -255,7 +255,7 @@ Le script doit être encodé en UTF-8 avec BOM. Sauvegardez en "UTF-8 with BOM" 
 
 ### Mise à jour automatique (patch en place)
 
-Pour les mises à jour mineures (ex: v2.0 → v2.0.1), un script `update.sh` est fourni. Il modifie directement le script installé sans toucher à votre configuration (Steam ID, heures de scan, pays) :
+Pour les mises à jour mineures (ex: v2.0.1 → v2.0.2), un script `update.sh` est fourni. Il modifie directement le script installé sans toucher à votre configuration (Steam ID, heures de scan, pays) :
 
 ```bash
 sudo ./update.sh
@@ -270,7 +270,7 @@ Le script :
 
 ### Mise à jour manuelle (remplacement complet)
 
-Pour les mises à jour majeures (ex: v2.0 → v3.0), remplacez le script et réinjectez votre configuration :
+Pour les mises à jour majeures (ex: v2.x → v3.0), remplacez le script et réinjectez votre configuration :
 
 ```bash
 # Sauvegarder votre Steam ID

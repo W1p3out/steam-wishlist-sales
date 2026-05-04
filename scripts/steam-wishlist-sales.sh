@@ -28,8 +28,8 @@ CACHE_FILE="${OUTPUT_DIR}/cache.json"
 PREVIOUS_SALES_FILE="${OUTPUT_DIR}/previous_sales.json"
 ENDOFSALES_FLAG="${OUTPUT_DIR}/endofsales.flag"
 SALE_DATES_FILE="${OUTPUT_DIR}/sale_dates.json"
-TEMP_DIR="/tmp/steam-wishlist-$$"
-LOCK_FILE="/tmp/steam-wishlist-sales.lock"
+TEMP_DIR=$(mktemp -d /tmp/steam-wishlist-XXXXXX)
+# Lock : utilise un répertoire (mkdir atomique) au lieu d'un fichier
 BATCH_SIZE=30
 DELAY_SECONDS=2
 COUNTRY_CODE="fr"
@@ -47,19 +47,27 @@ ok()   { echo -e "${GREEN}[OK]${NC} $1"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 err()  { echo -e "${RED}[ERR]${NC} $1"; }
 
-# ── Vérification du lock ─────────────────────────────────────
-if [ -f "$LOCK_FILE" ]; then
-    LOCK_AGE=$(( $(date +%s) - $(stat -c %Y "$LOCK_FILE") ))
-    if [ "$LOCK_AGE" -lt 360 ]; then
-        warn "Une mise à jour est déjà en cours (depuis ${LOCK_AGE}s). Abandon."
-        exit 0
+# ── Vérification du lock (mkdir est atomique, pas de race condition) ──
+LOCK_DIR="/tmp/steam-wishlist-sales.lock.d"
+if mkdir "$LOCK_DIR" 2>/dev/null; then
+    # Lock acquis — enregistrer le PID pour détecter les locks orphelins
+    echo $$ > "$LOCK_DIR/pid"
+    trap 'rm -rf "$LOCK_DIR" "$TEMP_DIR"' EXIT
+else
+    # Lock existe — vérifier s'il est périmé
+    if [ -d "$LOCK_DIR" ]; then
+        LOCK_AGE=$(( $(date +%s) - $(stat -c %Y "$LOCK_DIR") ))
+        LOCK_PID=$(cat "$LOCK_DIR/pid" 2>/dev/null || echo "?")
+        if [ "$LOCK_AGE" -lt 360 ]; then
+            warn "Scan déjà en cours (PID $LOCK_PID, depuis ${LOCK_AGE}s). Abandon."
+            exit 0
+        fi
+        warn "Lock périmé détecté (PID $LOCK_PID, ${LOCK_AGE}s), suppression."
+        rm -rf "$LOCK_DIR"
+        mkdir "$LOCK_DIR" && echo $$ > "$LOCK_DIR/pid"
+        trap 'rm -rf "$LOCK_DIR" "$TEMP_DIR"' EXIT
     fi
-    warn "Lock périmé détecté (${LOCK_AGE}s), suppression."
-    rm -f "$LOCK_FILE"
 fi
-
-touch "$LOCK_FILE"
-trap 'rm -f "$LOCK_FILE"; rm -rf "$TEMP_DIR"' EXIT
 
 # ── Vérification des dépendances ──────────────────────────────
 for cmd in curl jq bc; do
@@ -78,6 +86,13 @@ if [ ! -f "$CACHE_FILE" ]; then
     echo '{}' > "$CACHE_FILE"
     chmod 644 "$CACHE_FILE"
     chown www-data:www-data "$CACHE_FILE" 2>/dev/null
+fi
+
+# ── Validation du Steam ID ──
+if ! [[ "$STEAM_ID" =~ ^[0-9]{17}$ ]]; then
+    err "Steam ID invalide : '$STEAM_ID' (doit être 17 chiffres)"
+    err "Trouvez votre ID sur : https://steamid.io/"
+    exit 1
 fi
 
 START_TIME=$(date +%s)
@@ -675,7 +690,7 @@ cat > "$OUTPUT_FILE" << 'HTMLHEAD'
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 <aside class="sidebar" id="sidebar">
     <button class="sidebar-close" onclick="toggleSidebar()">&#10005;</button>
-    <div class="sidebar-logo"><span class="icon">&#127918;</span><h1>Steam Wishlist Sales Checker</h1><span class="version">v2.0.1</span></div>
+    <div class="sidebar-logo"><span class="icon">&#127918;</span><h1>Steam Wishlist Sales Checker</h1><span class="version">v2.0.2</span></div>
 
     <div class="sidebar-section">
         <div class="sidebar-section-title">Filtres rapides</div>
@@ -707,7 +722,7 @@ cat >> "$OUTPUT_FILE" << HTMLMETA
 </aside>
 
 <div class="main">
-    <div class="mobile-bar"><span class="mob-title">&#127918; Steam Wishlist Sales Checker</span><span class="mob-version">v2.0.1</span><button class="mob-burger" onclick="toggleSidebar()">&#9776;</button></div>
+    <div class="mobile-bar"><span class="mob-title">&#127918; Steam Wishlist Sales Checker</span><span class="mob-version">v2.0.2</span><button class="mob-burger" onclick="toggleSidebar()">&#9776;</button></div>
     <div class="topbar">
         <div class="search-box"><input type="text" id="search" placeholder="Rechercher un jeu..." /></div>
         <div class="topbar-right">
@@ -1120,7 +1135,7 @@ if (document.cookie.includes('swsc_endofsales=on')) {
         <h3>&#128722; Panier</h3>
         <p>Cliquez sur le &#10003; en haut &#224; gauche d'une carte pour s&#233;lectionner un jeu. Une barre appara&#238;t en bas avec le total, l'&#233;conomie et un bouton pour ouvrir les pages Steam. D&#233;sactivez votre bloqueur de pubs pour ouvrir plusieurs onglets.</p>
         <h3>&#127918; Version</h3>
-        <p>SWSC v2.0.1 &#8212; Code g&#233;n&#233;r&#233; avec Claude (Anthropic)</p>
+        <p>SWSC v2.0.2 &#8212; Code g&#233;n&#233;r&#233; avec Claude (Anthropic)</p>
     </div>
 </div>
 <div class="cart-bar" id="cartBar">

@@ -6,13 +6,29 @@
 $script     = '/opt/steam-wishlist-sales/steam-wishlist-sales.sh';
 $indexFile  = __DIR__ . '/index.html';
 $currentLog = '/tmp/steam-wishlist-current.log';
-$lockFile   = '/tmp/steam-wishlist-sales.lock';
+$lockFile   = '/tmp/steam-wishlist-sales.lock.d';
 $cacheFile  = __DIR__ . '/cache.json';
 $prevSalesFile = __DIR__ . '/previous_sales.json';
 
 if (!file_exists($script)) {
     die("Erreur : script introuvable.");
 }
+
+// ── Protection basique : vérifier que la requête vient du même serveur ──
+// Empêche un site tiers de déclencher un scan via une balise <img> ou un lien
+$referer = $_SERVER['HTTP_REFERER'] ?? '';
+$host = $_SERVER['HTTP_HOST'] ?? '';
+if (!empty($referer) && strpos($referer, $host) === false) {
+    http_response_code(403);
+    die("Accès refusé : requête externe.");
+}
+
+// ── Rate limiting : pas plus d'un scan toutes les 60 secondes ──
+$rateLimitFile = '/tmp/steam-wishlist-ratelimit';
+if (file_exists($rateLimitFile) && (time() - filemtime($rateLimitFile)) < 60) {
+    die("Un scan a été lancé il y a moins de 60 secondes. Veuillez patienter.");
+}
+touch($rateLimitFile);
 
 // Si demande de vidage du cache (sans relancer de scan)
 if (isset($_GET['clear-cache']) && $_GET['clear-cache'] === '1') {
@@ -42,7 +58,7 @@ if (isset($_GET['endofsales'])) {
 
 // Si un scan tourne déjà, rediriger directement vers update.php
 $startingFile = '/tmp/steam-wishlist-starting';
-if (file_exists($lockFile) || file_exists($startingFile)) {
+if (is_dir($lockFile) || file_exists($startingFile)) {
     header('Location: update.php');
     exit;
 }

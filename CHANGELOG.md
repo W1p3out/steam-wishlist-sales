@@ -2,6 +2,44 @@
 
 ---
 
+## v2.0.2 — 25/04/2026
+
+### 🇫🇷 Français
+
+#### 🔐 Sécurité
+
+**Validation du Steam ID** : le script Bash vérifie maintenant que le Steam ID est composé de 17 chiffres avant de lancer les requêtes. Auparavant, un ID malformé passait directement dans l'URL curl sans contrôle.
+
+**Répertoire temporaire imprévisible** : remplacement de `/tmp/steam-wishlist-$$` (PID prédictible, vulnérable aux attaques par lien symbolique) par `mktemp -d /tmp/steam-wishlist-XXXXXX` (6 caractères aléatoires).
+
+**Verrou atomique** : remplacement de `touch $LOCK_FILE` (race condition possible entre le test et la création) par `mkdir $LOCK_DIR` (opération atomique au niveau du kernel, impossible d'avoir deux scans parallèles).
+
+**~~Échappement de l'URL capsule~~ (retiré : instable en heredoc jq)** : ajout de `gsub("\""; "&quot;")` sur l'URL de l'image capsule dans le HTML généré. Dernier champ qui n'était pas sanitisé (défense en profondeur).
+
+**Protection PHP anti-CSRF** : vérification du `HTTP_REFERER` pour empêcher un site tiers de déclencher un scan via une balise HTML. Rate limiting d'un scan par minute maximum.
+
+**Cohérence PHP ↔ Bash** : le PHP vérifie désormais le répertoire de lock `.lock.d` (et non plus l'ancien fichier `.lock`) pour détecter correctement les scans en cours.
+
+---
+
+### 🇬🇧 English
+
+#### 🔐 Security
+
+**Steam ID validation**: the Bash script now verifies that the Steam ID is exactly 17 digits before making any requests. Previously, a malformed ID was passed directly into the curl URL without checks.
+
+**Unpredictable temp directory**: replaced `/tmp/steam-wishlist-$$` (predictable PID, vulnerable to symlink attacks) with `mktemp -d /tmp/steam-wishlist-XXXXXX` (6 random characters).
+
+**Atomic lock**: replaced `touch $LOCK_FILE` (race condition possible between test and creation) with `mkdir $LOCK_DIR` (kernel-level atomic operation, prevents parallel scans).
+
+**~~Capsule URL escaping~~ (removed: unstable in heredoc jq)**: added `gsub("\""; "&quot;")` on the capsule image URL in the generated HTML. Last field that wasn't sanitized (defense in depth).
+
+**PHP CSRF protection**: HTTP_REFERER check to prevent external sites from triggering a scan via an HTML tag. Rate limiting of one scan per minute maximum.
+
+**PHP ↔ Bash lock consistency**: PHP now checks the `.lock.d` lock directory (not the old `.lock` file) to correctly detect running scans.
+
+---
+
 ## v2.0.1 — 13/04/2026
 
 ### 🇫🇷 Français

@@ -4,9 +4,9 @@
 // ═══════════════════════════════════════════════════════════
 
 $currentLog = '/tmp/steam-wishlist-current.log';
-$lockFile   = '/tmp/steam-wishlist-sales.lock';
+$lockFile   = '/tmp/steam-wishlist-sales.lock.d';
 
-$isRunning = file_exists($lockFile);
+$isRunning = is_dir($lockFile);
 
 // Marqueur de démarrage : le script n'a pas encore créé le lock
 $startingFile = '/tmp/steam-wishlist-starting';
@@ -22,7 +22,7 @@ if (!$isRunning && file_exists($startingFile)) {
 }
 
 // Nettoyer le marqueur une fois le lock créé
-if (file_exists($lockFile) && file_exists($startingFile)) {
+if (is_dir($lockFile) && file_exists($startingFile)) {
     unlink($startingFile);
 }
 $logContent = file_exists($currentLog) ? file_get_contents($currentLog) : '';
@@ -55,7 +55,7 @@ $lineCount = count($logLines);
 
 // Temps écoulé depuis le lock
 $elapsed = 0;
-if (file_exists($lockFile)) {
+if (is_dir($lockFile)) {
     $elapsed = time() - filemtime($lockFile);
 }
 ?>

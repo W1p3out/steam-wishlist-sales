@@ -62,7 +62,7 @@ echo -e "${GREEN}[OK]${NC} Configuration sudoers supprimée"
 echo -e "${GREEN}[OK]${NC} Entrée crontab supprimée"
 
 # Nettoyage des fichiers temporaires
-rm -f /tmp/steam-wishlist-sales.lock
+rm -rf /tmp/steam-wishlist-sales.lock.d /tmp/steam-wishlist-sales.lock
 rm -f /tmp/steam-wishlist-current.log
 echo -e "${GREEN}[OK]${NC} Fichiers temporaires nettoyés"
 
