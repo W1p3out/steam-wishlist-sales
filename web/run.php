@@ -25,8 +25,8 @@ if (!empty($referer) && strpos($referer, $host) === false) {
 
 // ── Rate limiting : pas plus d'un scan toutes les 60 secondes ──
 $rateLimitFile = '/tmp/steam-wishlist-ratelimit';
-if (file_exists($rateLimitFile) && (time() - filemtime($rateLimitFile)) < 60) {
-    die("Un scan a été lancé il y a moins de 60 secondes. Veuillez patienter.");
+if (file_exists($rateLimitFile) && (time() - filemtime($rateLimitFile)) < 10) {
+    die("Un scan a été lancé il y a moins de 10 secondes. Veuillez patienter.");
 }
 touch($rateLimitFile);
 

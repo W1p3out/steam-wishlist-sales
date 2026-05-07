@@ -717,7 +717,7 @@ $Html = @"
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 <aside class="sidebar" id="sidebar">
     <button class="sidebar-close" onclick="toggleSidebar()">&#10005;</button>
-    <div class="sidebar-logo"><span class="icon">&#127918;</span><h1>Steam Wishlist Sales Checker</h1><span class="version">v2.0.2</span></div>
+    <div class="sidebar-logo"><span class="icon">&#127918;</span><h1>Steam Wishlist Sales Checker</h1><span class="version">v2.0.3</span></div>
     <div class="sidebar-section">
         <div class="sidebar-section-title">Filtres rapides</div>
         <button class="sidebar-btn active" data-genre="all"><span>&#128203; Tout</span></button>
@@ -739,7 +739,7 @@ $Html = @"
 </aside>
 
 <div class="main">
-    <div class="mobile-bar"><span class="mob-title">&#127918; Steam Wishlist Sales Checker</span><span class="mob-version">v2.0.2</span><button class="mob-burger" onclick="toggleSidebar()">&#9776;</button></div>
+    <div class="mobile-bar"><span class="mob-title">&#127918; Steam Wishlist Sales Checker</span><span class="mob-version">v2.0.3</span><button class="mob-burger" onclick="toggleSidebar()">&#9776;</button></div>
     <div class="topbar">
         <div class="search-box"><input type="text" id="search" placeholder="Rechercher un jeu..." /></div>
         <div class="topbar-right">
@@ -1068,7 +1068,7 @@ if (SALE_DATES && Object.keys(SALE_DATES).length > 0) {
         <p><code>"C:\chemin\Steam_Wishlist_Sales_Checker.exe" -SteamID 12345678901234567</code></p>
         <p>Vous pouvez ainsi lancer un scan en double-cliquant, sans configurer &#224; chaque lancement. Les autres arguments se placent &#224; la suite du SteamID.</p>
         <h3>&#127918; Version</h3>
-        <p>SWSC v2.0.2 &#8212; Code g&#233;n&#233;r&#233; avec Claude (Anthropic)</p>
+        <p>SWSC v2.0.3 &#8212; Code g&#233;n&#233;r&#233; avec Claude (Anthropic)</p>
     </div>
 </div>
 <div class="cart-bar" id="cartBar">

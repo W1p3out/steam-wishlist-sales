@@ -2,6 +2,24 @@
 
 ---
 
+## v2.0.3 — 04/05/2026
+
+### 🇫🇷 Français
+
+#### 🐛 Correction
+
+**Rate limiting PHP** : le délai anti-spam de `run.php` est passé de 60 secondes à 10 secondes. À 60s, il bloquait l'utilisation normale depuis l'interface web (cliquer sur « Actualiser le scan » déclenchait le message d'attente). Le verrou atomique `mkdir` empêche déjà les scans parallèles — le rate limiting n'est qu'une protection supplémentaire contre le spam automatisé.
+
+---
+
+### 🇬🇧 English
+
+#### 🐛 Fix
+
+**PHP rate limiting**: reduced the anti-spam delay in `run.php` from 60 seconds to 10 seconds. At 60s, it was blocking normal usage from the web interface (clicking "Refresh scan" would trigger the wait message). The atomic `mkdir` lock already prevents parallel scans — rate limiting is only an extra protection against automated spam.
+
+---
+
 ## v2.0.2 — 25/04/2026
 
 ### 🇫🇷 Français

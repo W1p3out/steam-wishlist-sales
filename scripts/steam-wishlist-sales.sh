@@ -690,7 +690,7 @@ cat > "$OUTPUT_FILE" << 'HTMLHEAD'
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 <aside class="sidebar" id="sidebar">
     <button class="sidebar-close" onclick="toggleSidebar()">&#10005;</button>
-    <div class="sidebar-logo"><span class="icon">&#127918;</span><h1>Steam Wishlist Sales Checker</h1><span class="version">v2.0.2</span></div>
+    <div class="sidebar-logo"><span class="icon">&#127918;</span><h1>Steam Wishlist Sales Checker</h1><span class="version">v2.0.3</span></div>
 
     <div class="sidebar-section">
         <div class="sidebar-section-title">Filtres rapides</div>
@@ -722,7 +722,7 @@ cat >> "$OUTPUT_FILE" << HTMLMETA
 </aside>
 
 <div class="main">
-    <div class="mobile-bar"><span class="mob-title">&#127918; Steam Wishlist Sales Checker</span><span class="mob-version">v2.0.2</span><button class="mob-burger" onclick="toggleSidebar()">&#9776;</button></div>
+    <div class="mobile-bar"><span class="mob-title">&#127918; Steam Wishlist Sales Checker</span><span class="mob-version">v2.0.3</span><button class="mob-burger" onclick="toggleSidebar()">&#9776;</button></div>
     <div class="topbar">
         <div class="search-box"><input type="text" id="search" placeholder="Rechercher un jeu..." /></div>
         <div class="topbar-right">
@@ -1135,7 +1135,7 @@ if (document.cookie.includes('swsc_endofsales=on')) {
         <h3>&#128722; Panier</h3>
         <p>Cliquez sur le &#10003; en haut &#224; gauche d'une carte pour s&#233;lectionner un jeu. Une barre appara&#238;t en bas avec le total, l'&#233;conomie et un bouton pour ouvrir les pages Steam. D&#233;sactivez votre bloqueur de pubs pour ouvrir plusieurs onglets.</p>
         <h3>&#127918; Version</h3>
-        <p>SWSC v2.0.2 &#8212; Code g&#233;n&#233;r&#233; avec Claude (Anthropic)</p>
+        <p>SWSC v2.0.3 &#8212; Code g&#233;n&#233;r&#233; avec Claude (Anthropic)</p>
     </div>
 </div>
 <div class="cart-bar" id="cartBar">
